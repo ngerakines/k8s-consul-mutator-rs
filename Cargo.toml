@@ -14,17 +14,11 @@ build = "build.rs"
 anyhow = "1"
 async-trait = {version = "0.1"}
 axum = "0.6.2"
-axum-extra = { version = "0.4", default-features = false, features = ["cookie-signed"] }
-crossbeam-epoch = "0.9.13"
-crossbeam-utils = "0.8.14"
-derive_more = "0.99"
-hex = "0.4.3"
 k8s-openapi = { version = "0.17.0", features = ["v1_26"] }
 kube = { version = "0.78.0", default-features = false, features = ["admission", "rustls-tls"] }
 parking_lot = "0.12"
 rand = "0.8"
 json-patch = "0.3.0"
-redis = "0.22"
 sentry = { version = "0.29", default-features = false, features = ["backtrace", "contexts", "panic", "rustls", "reqwest", "tower", "tracing"] }
 sentry-anyhow = "0.29"
 sentry-tower = { version = "0.29", features = ["http"] }
@@ -36,7 +30,6 @@ tower = { version = "0.4" }
 tower-http = { version = "0.3", features = ["trace"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-url = "2.3"
 
 [dev-dependencies]
 axum-test-helper = { version = "0.2.0" }
@@ -44,4 +37,3 @@ axum-test-helper = { version = "0.2.0" }
 [profile.release]
 lto = true
 strip = true
-
