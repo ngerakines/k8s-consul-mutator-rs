@@ -55,17 +55,40 @@ fn mutate(
         return Ok(res);
     }
     let found_keys: Vec<String> = obj
-        .labels()
+        .annotations()
         .keys()
         .cloned()
         .filter(|x| x.starts_with("k8s-consul-mutator.io/key-"))
         .collect();
 
-    for found_key in found_keys {
-        println!("Got: {}", found_key);
+    if found_keys.is_empty() {
+        return Ok(res);
     }
 
-    Ok(res)
+    let mut patches = Vec::new();
+
+    for found_key in found_keys {
+        let key = found_key.replace("k8s-consul-mutator.io/key-", "");
+
+        let checksum_key = format!("k8s-consul-mutator.io/checksum-{key}");
+        if obj.annotations().contains_key(checksum_key.as_str()) {
+            continue;
+        }
+
+        if obj.metadata.annotations.is_none() {
+            patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
+                path: "/metadata/annotations".into(),
+                value: serde_json::Value::Object(serde_json::Map::new()),
+            }));
+        }
+
+        patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
+            // https://jsonpatch.com/#json-pointer
+            path: format!("/metadata/annotations/k8s-consul-mutator.io~1checksum-{key}"),
+            value: serde_json::Value::String("checksum".into()),
+        }));
+    }
+    Ok(res.with_patch(json_patch::Patch(patches))?)
 }
 
 async fn shutdown_signal() {
