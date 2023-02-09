@@ -28,3 +28,9 @@ metadata:
     k8s-consul-mutator.io/key-app-config: app/config
     k8s-consul-mutator.io/checksum-app-config: md5-b1e46790875837e159c0787bac2e29be
 ```
+
+# Disclosures
+
+GitHub Copilot contributed to code in this repository.
+
+Commits that were influenced by GitHub Copilot will have the `[copilot]` tag appended.
