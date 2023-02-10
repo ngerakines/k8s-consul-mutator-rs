@@ -21,7 +21,7 @@ async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn handle_mutate(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<AdmissionReview<DynamicObject>>,
 ) -> impl IntoResponse {
     let req: AdmissionRequest<_> = match payload.try_into() {
@@ -35,7 +35,7 @@ async fn handle_mutate(
     let mut res = AdmissionResponse::from(&req);
 
     if let Some(obj) = req.object {
-        res = match mutate(res.clone(), &obj) {
+        res = match mutate(&state, res.clone(), &obj).await {
             Ok(res) => res,
             Err(err) => res.deny(err.to_string()),
         };
@@ -45,7 +45,8 @@ async fn handle_mutate(
     Ok((StatusCode::OK, Json(real_res.clone()))) as Result<_, ConMutError>
 }
 
-fn mutate(
+async fn mutate(
+    state: &AppState,
     res: AdmissionResponse,
     obj: &DynamicObject,
 ) -> Result<AdmissionResponse, Box<dyn Error>> {
@@ -80,11 +81,16 @@ fn mutate(
             }));
         }
 
-        patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
-            // https://jsonpatch.com/#json-pointer
-            path: format!("/metadata/annotations/k8s-consul-mutator.io~1checksum-{key}"),
-            value: serde_json::Value::String("checksum".into()),
-        }));
+        state.storage.watch(key.clone()).await?;
+
+        let checksum = state.storage.get(key.clone()).await?;
+        if checksum.is_some() {
+            patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
+                // https://jsonpatch.com/#json-pointer
+                path: format!("/metadata/annotations/k8s-consul-mutator.io~1checksum-{key}"),
+                value: serde_json::Value::String(checksum.unwrap()),
+            }));
+        }
     }
     Ok(res.with_patch(json_patch::Patch(patches))?)
 }
