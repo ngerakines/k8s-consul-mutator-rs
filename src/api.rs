@@ -17,9 +17,7 @@ use crate::error::{ConMutError, Result};
 use crate::state::AppState;
 
 async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
-    Json(json!({
-        "version": state.version,
-    }))
+    Json(json!({"version": state.version}))
 }
 
 async fn handle_mutate(
@@ -91,12 +89,6 @@ fn mutate(
     Ok(res.with_patch(json_patch::Patch(patches))?)
 }
 
-async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("expect tokio signal ctrl-c");
-}
-
 pub fn build_router(shared_state: AppState) -> Router {
     Router::new()
         .route("/", get(handle_index))
@@ -107,28 +99,24 @@ pub fn build_router(shared_state: AppState) -> Router {
         .with_state(shared_state)
 }
 
-pub async fn run(listen: &str, shared_state: AppState) -> Result<()> {
-    let app = build_router(shared_state);
-
-    axum::Server::bind(&listen.parse().unwrap())
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use crate::state;
 
     use super::*;
+    use crate::consul::{KeyManager, NullKeyManager};
+
     use axum::http::StatusCode;
     use axum_test_helper::TestClient;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn test_handle_index() {
-        let shared_state = state::AppState(Arc::new(state::InnerState::new("1".to_string())));
+        let key_manager = Box::new(NullKeyManager::default()) as Box<dyn KeyManager>;
+        let shared_state = state::AppState(Arc::new(state::InnerState::new(
+            "1".to_string(),
+            key_manager,
+        )));
         let router = build_router(shared_state);
         let client = TestClient::new(router);
         let res = client.get("/").send().await;
