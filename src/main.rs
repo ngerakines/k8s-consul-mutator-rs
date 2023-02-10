@@ -86,6 +86,7 @@ async fn main() -> Result<()> {
     let shared_state = state::AppState(Arc::new(state::InnerState::new(
         version.to_string(),
         key_manager,
+        tasker.clone(),
     )));
 
     let local_state = shared_state.clone();
@@ -97,7 +98,7 @@ async fn main() -> Result<()> {
             counter += 1;
             info!("background loop {counter}");
             local_state
-                .storage
+                .key_manager
                 .set("loop".to_string(), counter.to_string())
                 .await
                 .unwrap();

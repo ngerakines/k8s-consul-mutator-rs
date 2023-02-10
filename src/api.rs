@@ -81,9 +81,9 @@ async fn mutate(
             }));
         }
 
-        state.storage.watch(key.clone()).await?;
+        state.key_manager.watch(key.clone()).await?;
 
-        let checksum = state.storage.get(key.clone()).await?;
+        let checksum = state.key_manager.get(key.clone()).await?;
         if checksum.is_some() {
             patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
                 // https://jsonpatch.com/#json-pointer
@@ -110,7 +110,6 @@ mod tests {
     use crate::state;
 
     use super::*;
-    use crate::consul::{KeyManager, NullKeyManager};
 
     use axum::http::StatusCode;
     use axum_test_helper::TestClient;
@@ -118,15 +117,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_index() {
-        let key_manager = Box::new(NullKeyManager::default()) as Box<dyn KeyManager>;
-        let shared_state = state::AppState(Arc::new(state::InnerState::new(
-            "1".to_string(),
-            key_manager,
-        )));
-        let router = build_router(shared_state);
+        let router = build_router(state::AppState(Arc::new(Default::default())));
         let client = TestClient::new(router);
         let res = client.get("/").send().await;
         assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, r#"{"version":"1"}"#);
+        assert_eq!(res.text().await, r#"{"version":"default"}"#);
     }
 }

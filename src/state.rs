@@ -1,19 +1,38 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::consul::KeyManager;
+use crate::consul::{KeyManager, NullKeyManager};
 
 #[derive(Clone)]
 pub struct AppState(pub Arc<InnerState>);
 
 pub struct InnerState {
     pub version: String,
-    pub storage: Box<dyn KeyManager>,
+    pub key_manager: Box<dyn KeyManager>,
+    pub tasker: tokio_tasker::Tasker,
+}
+
+impl Default for InnerState {
+    fn default() -> Self {
+        InnerState {
+            version: "default".to_string(),
+            key_manager: Box::new(NullKeyManager::default()) as Box<dyn KeyManager>,
+            tasker: tokio_tasker::Tasker::new(),
+        }
+    }
 }
 
 impl InnerState {
-    pub fn new(version: String, storage: Box<dyn KeyManager>) -> Self {
-        Self { version, storage }
+    pub fn new(
+        version: String,
+        key_manager: Box<dyn KeyManager>,
+        tasker: tokio_tasker::Tasker,
+    ) -> Self {
+        Self {
+            version,
+            key_manager,
+            tasker,
+        }
     }
 }
 
@@ -22,18 +41,5 @@ impl Deref for AppState {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::consul::NullKeyManager;
-
-    #[test]
-    fn create_app_staet() {
-        let key_manager = Box::new(NullKeyManager::default()) as Box<dyn KeyManager>;
-        let app_state = InnerState::new("1.0.0".to_string(), key_manager);
-        assert_eq!(app_state.version, "1.0.0");
     }
 }
