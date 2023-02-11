@@ -34,3 +34,18 @@ metadata:
 GitHub Copilot contributed to code in this repository.
 
 Commits that were influenced by GitHub Copilot will have the `[copilot]` tag appended.
+
+# Roadmap
+
+- [X] Project stubbed out
+- [X] HTTP endpoint for status
+- [X] HTTP endpoint for mutate
+- [X] Key manager for checksums
+- [X] Consul configuration at start
+- [X] Background workers for polling consul kv reads
+- [ ] Track kubernetes resources to update
+- [ ] Update kubernetes resources on consul kv change
+- [ ] Support sha checksums
+- [ ] Support fnv checksums
+- [ ] Support consul key index values as checksums
+- [ ] Populate background workers at startup
