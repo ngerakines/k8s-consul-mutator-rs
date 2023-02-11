@@ -14,16 +14,13 @@ build = "build.rs"
 anyhow = "1"
 async-trait = {version = "0.1"}
 axum = "0.6.2"
-base64 = "0.21.0"
 consulrs = "0.1.0"
-ctrlc = { version = "3.0", features = ["termination"] }
 futures-util = "0.3.17"
 json-patch = "0.3.0"
 k8s-openapi = { version = "0.17.0", features = ["v1_26"] }
 kube = { version = "0.78.0", default-features = false, features = ["admission", "rustls-tls"] }
 md5 = "0.7.0"
 parking_lot = "0.12"
-pin-project-lite = "0.2.7"
 rand = "0.8"
 sentry = { version = "0.29", default-features = false, features = ["backtrace", "contexts", "panic", "rustls", "reqwest", "tower", "tracing"] }
 sentry-anyhow = "0.29"
