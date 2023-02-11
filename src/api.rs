@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use consulrs::client::ConsulClientSettingsBuilder;
 use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, ResourceExt,
@@ -13,10 +14,32 @@ use serde_json::json;
 use std::error::Error;
 use tower_http::trace::TraceLayer;
 
-use crate::error::{ConMutError, Result};
 use crate::state::AppState;
+use crate::{
+    consul::check_key,
+    error::{ConMutError, Result},
+};
 
 async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
+    let consul_config = ConsulClientSettingsBuilder::default()
+        .address("http://127.0.0.1:8500")
+        .build()
+        .unwrap();
+
+    let tasker2 = state.tasker.clone();
+    let task_shared_state = state.clone();
+    state.tasker.spawn(async move {
+        check_key(
+            consul_config,
+            "apps/foo/settings".to_string(),
+            "10s".to_string(),
+            tasker2.stopper(),
+            task_shared_state,
+        )
+        .await;
+        tasker2.finish();
+    });
+
     Json(json!({"version": state.version}))
 }
 

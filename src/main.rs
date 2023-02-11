@@ -5,19 +5,19 @@ use sentry_tracing::EventFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use tokio::signal;
-use tokio::time::{sleep, Duration};
-use tracing::info;
-
-use tokio_tasker::Tasker;
+use tracing::{debug, info};
 
 mod api;
 mod consul;
 mod error;
+mod key_manager;
 mod state;
 
 use api::build_router;
-use consul::{KeyManager, MemoryKeyManager, NullKeyManager};
 use error::Result;
+use key_manager::{KeyManager, MemoryKeyManager, NullKeyManager};
+
+use tokio_tasker::Tasker;
 
 async fn shutdown_signal() {
     let ctrl_c = async {
@@ -83,45 +83,32 @@ async fn main() -> Result<()> {
         _ => Box::<NullKeyManager>::default() as Box<dyn KeyManager>,
     };
 
-    let shared_state = state::AppState(Arc::new(state::InnerState::new(
-        version.to_string(),
-        key_manager,
-        tasker.clone(),
-    )));
+    {
+        let state_tasker = tasker.clone();
+        let shared_state = state::AppState(Arc::new(state::InnerState::new(
+            version.to_string(),
+            key_manager,
+            state_tasker.clone(),
+        )));
 
-    let local_state = shared_state.clone();
+        let app = build_router(shared_state.clone());
 
-    let loop_tasker = tasker.clone();
-    tasker.spawn(async move {
-        let mut counter = 1;
-        while !loop_tasker.stopper().is_stopped() {
-            counter += 1;
-            info!("background loop {counter}");
-            local_state
-                .key_manager
-                .set("loop".to_string(), counter.to_string())
-                .await
-                .unwrap();
-            sleep(Duration::from_secs(5)).await;
-        }
-        info!("background loop stopped");
-        loop_tasker.finish();
-    });
+        axum::Server::bind(&format!("0.0.0.0:{port}").parse().unwrap())
+            .serve(app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
 
-    let app = build_router(shared_state.clone());
+        state_tasker.finish();
+    }
 
     let signaller = tasker.signaller();
-
-    axum::Server::bind(&format!("0.0.0.0:{port}").parse().unwrap())
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-
     if signaller.stop() {
-        info!("Stopping background tasks");
+        debug!("Stopping background tasks");
     }
 
     tasker.join().await;
+
+    debug!("Shutdown complete");
 
     Ok(())
 }

@@ -1,7 +1,8 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::consul::{KeyManager, NullKeyManager};
+use crate::key_manager::{KeyManager, NullKeyManager};
+use tokio_tasker::Tasker;
 
 #[derive(Clone)]
 pub struct AppState(pub Arc<InnerState>);
@@ -9,7 +10,7 @@ pub struct AppState(pub Arc<InnerState>);
 pub struct InnerState {
     pub version: String,
     pub key_manager: Box<dyn KeyManager>,
-    pub tasker: tokio_tasker::Tasker,
+    pub tasker: Tasker,
 }
 
 impl Default for InnerState {
@@ -17,17 +18,13 @@ impl Default for InnerState {
         InnerState {
             version: "default".to_string(),
             key_manager: Box::new(NullKeyManager::default()) as Box<dyn KeyManager>,
-            tasker: tokio_tasker::Tasker::new(),
+            tasker: Tasker::new(),
         }
     }
 }
 
 impl InnerState {
-    pub fn new(
-        version: String,
-        key_manager: Box<dyn KeyManager>,
-        tasker: tokio_tasker::Tasker,
-    ) -> Self {
+    pub fn new(version: String, key_manager: Box<dyn KeyManager>, tasker: Tasker) -> Self {
         Self {
             version,
             key_manager,

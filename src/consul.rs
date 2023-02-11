@@ -1,113 +1,109 @@
-use async_trait::async_trait;
-use parking_lot::Mutex;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use consulrs::{
+    api::{features::Blocking, kv::requests::ReadKeyRequest, Features},
+    client::{ConsulClient, ConsulClientSettings},
+    kv,
+};
+use std::convert::TryInto;
+use std::error::Error;
 
-use crate::error::Result;
+use crate::state::AppState;
+use tokio::time::{sleep, Duration};
+use tokio_tasker::Stopper;
+use tracing::{debug, info, warn};
 
-#[async_trait]
-pub trait KeyManager: Sync + Send {
-    async fn watch(&self, key: String) -> Result<bool>;
-    async fn set(&self, key: String, value: String) -> Result<()>;
-    async fn get(&self, key: String) -> Result<Option<String>>;
-}
+pub async fn check_key(
+    consul_config: ConsulClientSettings,
+    consul_key: String,
+    timeout: String,
+    stopper: Stopper,
+    app_state: AppState,
+) {
+    let consul_client = ConsulClient::new(consul_config).unwrap();
 
-pub struct NullKeyManager;
-
-impl Default for NullKeyManager {
-    fn default() -> Self {
-        NullKeyManager
-    }
-}
-
-#[async_trait]
-impl KeyManager for NullKeyManager {
-    async fn watch(&self, _key: String) -> Result<bool> {
-        Ok(true)
-    }
-
-    async fn set(&self, _key: String, _value: String) -> Result<()> {
-        Ok(())
-    }
-
-    async fn get(&self, _key: String) -> Result<Option<String>> {
-        Ok(None)
-    }
-}
-
-#[derive(Default)]
-struct InnerMemoryKeyManager {
-    data: HashMap<String, String>,
-    keys: HashSet<String>,
-}
-
-#[derive(Default)]
-pub struct MemoryKeyManager {
-    inner: Mutex<RefCell<InnerMemoryKeyManager>>,
-}
-
-#[async_trait]
-impl KeyManager for MemoryKeyManager {
-    async fn watch(&self, key: String) -> Result<bool> {
-        let inner_lock = self.inner.lock();
-        let mut inner = inner_lock.borrow_mut();
-
-        if inner.data.contains_key(&key) {
-            return Ok(false);
+    let res = kv::read(&consul_client, &consul_key, None).await;
+    if let Err(err) = res {
+        println!("error {:?}", err);
+        if let Some(source) = err.source() {
+            println!("error source {:?}", source);
         }
-        if inner.keys.contains(&key) {
-            return Ok(false);
+        return;
+    }
+    let success = res.unwrap();
+    println!(
+        "{} {}",
+        consul_key.clone(),
+        success.response[0].modify_index
+    );
+
+    let mut key_index = success.response[0].modify_index;
+
+    info!("watch {consul_key} starting");
+    while !stopper.is_stopped() {
+        println!("{consul_key} {key_index}");
+        let wait_res = kv::read(
+            &consul_client,
+            &consul_key,
+            Some(
+                ReadKeyRequest::builder().features(
+                    Features::builder()
+                        .blocking(Blocking {
+                            index: key_index,
+                            wait: Some(timeout.clone()),
+                        })
+                        .build()
+                        .unwrap(),
+                ),
+            ),
+        )
+        .await;
+        if stopper.is_stopped() {
+            break;
         }
-        inner.keys.insert(key);
 
-        Ok(true)
-    }
-
-    async fn set(&self, key: String, value: String) -> Result<()> {
-        let inner_lock = self.inner.lock();
-        let mut inner = inner_lock.borrow_mut();
-
-        inner.data.insert(key, value);
-
-        Ok(())
-    }
-
-    async fn get(&self, state: String) -> Result<Option<String>> {
-        let inner_lock = self.inner.lock();
-        let inner = inner_lock.borrow();
-
-        match inner.data.get(&state) {
-            Some(val_ref) => Ok(Some(val_ref.to_owned())),
-            None => Ok(None),
+        if let Err(err) = wait_res {
+            if let Some(source) = err.source() {
+                warn!("watch {consul_key} error: {:?} - {:?}", err, source);
+            } else {
+                warn!("watch {consul_key} error: {:?}", err);
+            }
+            sleep(Duration::from_secs(10)).await;
+            continue;
         }
-    }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::consul::NullKeyManager;
+        let mut wait_success = wait_res.unwrap();
 
-    #[tokio::test]
-    async fn null_key_manager() {
-        let key_manager = Box::new(NullKeyManager::default()) as Box<dyn KeyManager>;
-        let watch_res = key_manager.watch("test".to_string()).await;
-        assert!(watch_res.is_ok());
-        assert_eq!(watch_res.unwrap(), true);
-    }
+        if wait_success.response.is_empty() {
+            warn!("watch {consul_key} error: no keys returned from consul for key");
+            sleep(Duration::from_secs(10)).await;
+            continue;
+        }
 
-    #[tokio::test]
-    async fn memory_key_manager() {
-        let key_manager = Box::new(MemoryKeyManager::default()) as Box<dyn KeyManager>;
+        let kv = wait_success.response.pop().unwrap();
+        if kv.modify_index == key_index {
+            debug!("watch {consul_key} error: modify index is the same as last time {key_index}");
+            continue;
+        }
+
+        key_index = kv.modify_index;
+
+        if kv.value.is_none() {
+            warn!("watch {consul_key} error: value option is none");
+            sleep(Duration::from_secs(10)).await;
+            continue;
+        }
+
+        let key_content: Vec<u8> = kv.value.unwrap().try_into().unwrap_or_else(|_| Vec::new());
+        let digest = md5::compute(key_content);
+
+        info!("watch {consul_key} checksum: {:x}", digest);
+        if let Err(err) = app_state
+            .key_manager
+            .set(consul_key.clone(), format!("{:x}", digest))
+            .await
         {
-            let watch_res = key_manager.watch("test".to_string()).await;
-            assert!(watch_res.is_ok());
-            assert_eq!(watch_res.unwrap(), true);
+            warn!("watch {consul_key} error: {err}");
         }
-        {
-            let watch_res2 = key_manager.watch("test".to_string()).await;
-            assert!(watch_res2.is_ok());
-            assert_eq!(watch_res2.unwrap(), false);
-        }
+        info!("watch {consul_key} looping");
     }
+    info!("watch {consul_key} stopping");
 }
