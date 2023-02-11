@@ -1,6 +1,7 @@
 use std::env;
 use std::sync::Arc;
 
+use consulrs::client::ConsulClientSettingsBuilder;
 use sentry_tracing::EventFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -83,11 +84,17 @@ async fn main() -> Result<()> {
         _ => Box::<NullKeyManager>::default() as Box<dyn KeyManager>,
     };
 
+    let mut consul_config_builder = ConsulClientSettingsBuilder::default();
+    if let Ok(consul_address) = env::var("CONSUL_ADDRESS") {
+        consul_config_builder.address(consul_address);
+    }
+
     {
         let state_tasker = tasker.clone();
         let shared_state = state::AppState(Arc::new(state::InnerState::new(
             version.to_string(),
             key_manager,
+            consul_config_builder.build().unwrap(),
             state_tasker.clone(),
         )));
 

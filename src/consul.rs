@@ -20,26 +20,26 @@ pub async fn check_key(
 ) {
     let consul_client = ConsulClient::new(consul_config).unwrap();
 
-    let res = kv::read(&consul_client, &consul_key, None).await;
-    if let Err(err) = res {
-        println!("error {:?}", err);
-        if let Some(source) = err.source() {
-            println!("error source {:?}", source);
-        }
-        return;
-    }
-    let success = res.unwrap();
-    println!(
-        "{} {}",
-        consul_key.clone(),
-        success.response[0].modify_index
-    );
+    // let res = kv::read(&consul_client, &consul_key, None).await;
+    // if let Err(err) = res {
+    //     debug!("error {:?}", err);
+    //     if let Some(source) = err.source() {
+    //         debug!("error source {:?}", source);
+    //     }
+    //     return;
+    // }
+    // let success = res.unwrap();
+    // println!(
+    //     "{} {}",
+    //     consul_key.clone(),
+    //     success.response[0].modify_index
+    // );
 
-    let mut key_index = success.response[0].modify_index;
+    let mut key_index = 0;
 
-    info!("watch {consul_key} starting");
+    debug!("watch {consul_key} starting");
     while !stopper.is_stopped() {
-        println!("{consul_key} {key_index}");
+        debug!("{consul_key} {key_index} loop");
         let wait_res = kv::read(
             &consul_client,
             &consul_key,
@@ -56,6 +56,7 @@ pub async fn check_key(
             ),
         )
         .await;
+
         if stopper.is_stopped() {
             break;
         }
@@ -90,6 +91,10 @@ pub async fn check_key(
             warn!("watch {consul_key} error: value option is none");
             sleep(Duration::from_secs(10)).await;
             continue;
+        }
+
+        if stopper.is_stopped() {
+            break;
         }
 
         let key_content: Vec<u8> = kv.value.unwrap().try_into().unwrap_or_else(|_| Vec::new());

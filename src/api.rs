@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use axum::{
     extract::{Json, State},
     http::{Request, StatusCode},
@@ -5,11 +6,11 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use consulrs::client::ConsulClientSettingsBuilder;
 use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, ResourceExt,
 };
+use serde::Deserialize;
 use serde_json::json;
 use std::error::Error;
 use tower_http::trace::TraceLayer;
@@ -20,27 +21,47 @@ use crate::{
     error::{ConMutError, Result},
 };
 
+#[derive(Deserialize)]
+struct WatchRequest {
+    key: String,
+}
+
 async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
-    let consul_config = ConsulClientSettingsBuilder::default()
-        .address("http://127.0.0.1:8500")
-        .build()
-        .unwrap();
-
-    let tasker2 = state.tasker.clone();
-    let task_shared_state = state.clone();
-    state.tasker.spawn(async move {
-        check_key(
-            consul_config,
-            "apps/foo/settings".to_string(),
-            "10s".to_string(),
-            tasker2.stopper(),
-            task_shared_state,
-        )
-        .await;
-        tasker2.finish();
-    });
-
     Json(json!({"version": state.version}))
+}
+
+async fn handle_watch(
+    State(state): State<AppState>,
+    Json(payload): Json<WatchRequest>,
+) -> impl IntoResponse {
+    let is_new_watch_res = state
+        .key_manager
+        .watch(payload.key.clone())
+        .await
+        .map_err(|err| anyhow!(err.to_string()));
+    if is_new_watch_res.is_err() {
+        return Json(json!({"error": is_new_watch_res.err().unwrap().to_string()}));
+    }
+    let is_new_watch = is_new_watch_res.unwrap();
+
+    if is_new_watch {
+        let tasker2 = state.tasker.clone();
+        let task_shared_state = state.clone();
+        let consul_config = state.consul_settings.clone();
+        state.tasker.spawn(async move {
+            check_key(
+                consul_config,
+                payload.key.clone(),
+                "10s".to_string(),
+                tasker2.stopper(),
+                task_shared_state,
+            )
+            .await;
+            tasker2.finish();
+        });
+    }
+
+    Json(json!({ "created": is_new_watch }))
 }
 
 async fn handle_mutate(
@@ -122,6 +143,7 @@ pub fn build_router(shared_state: AppState) -> Router {
     Router::new()
         .route("/", get(handle_index))
         .route("/mutate", post(handle_mutate))
+        .route("/api/v1/watch", post(handle_watch))
         .layer(sentry_tower::NewSentryLayer::<Request<_>>::new_from_top())
         .layer(sentry_tower::SentryHttpLayer::with_transaction())
         .layer(TraceLayer::new_for_http())
