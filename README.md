@@ -49,3 +49,7 @@ Commits that were influenced by GitHub Copilot will have the `[copilot]` tag app
 - [ ] Support fnv checksums
 - [ ] Support consul key index values as checksums
 - [ ] Populate background workers at startup
+- [ ] Configuration for consul tokens
+- [ ] Configuration for default checksum type
+- [ ] Configuration validation on start
+- [ ] Helm chart
