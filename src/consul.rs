@@ -20,21 +20,6 @@ pub async fn check_key(
 ) {
     let consul_client = ConsulClient::new(consul_config).unwrap();
 
-    // let res = kv::read(&consul_client, &consul_key, None).await;
-    // if let Err(err) = res {
-    //     debug!("error {:?}", err);
-    //     if let Some(source) = err.source() {
-    //         debug!("error source {:?}", source);
-    //     }
-    //     return;
-    // }
-    // let success = res.unwrap();
-    // println!(
-    //     "{} {}",
-    //     consul_key.clone(),
-    //     success.response[0].modify_index
-    // );
-
     let mut key_index = 0;
 
     debug!("watch {consul_key} starting");
