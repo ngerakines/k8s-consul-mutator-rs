@@ -1,0 +1,26 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: k8s-consul-mutator-rs
+  labels:
+    app: k8s-consul-mutator-rs
+webhooks:
+  - name: k8s-consul-mutator-rs.k8s-consul-mutator-rs.svc.cluster.local
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    clientConfig:
+      caBundle: PLACEHOLDER
+      service:
+        name: k8s-consul-mutator-rs
+        namespace: k8s-consul-mutator-rs
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["", "apps"]
+        apiVersions: ["v1"]
+        resources: ["deployment"]
+        scope: "*"
+    namespaceSelector:
+      matchLabels:
+        k8s-consul-mutator-rs: enabled

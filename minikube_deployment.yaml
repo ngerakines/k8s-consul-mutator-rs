@@ -1,0 +1,56 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-consul-mutator-rs
+  namespace: k8s-consul-mutator-rs
+  labels:
+    app: k8s-consul-mutator-rs
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: k8s-consul-mutator-rs
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: k8s-consul-mutator-rs
+    spec:
+      terminationGracePeriodSeconds: 90
+      containers:
+        - name: app
+          image: "localhost:5000/k8s-consul-mutator-rs:latest"
+          imagePullPolicy: Always
+          env:
+          - name: CERTIFICATE
+            value: /etc/ssl/certs/k8s-consul-mutator-rs.pem
+          - name: CERTIFICATE_KEY
+            value: /etc/ssl/certs/k8s-consul-mutator-rs.key
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            timeoutSeconds: 10
+            failureThreshold: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            timeoutSeconds: 10
+            failureThreshold: 6
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http

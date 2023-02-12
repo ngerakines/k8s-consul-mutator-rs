@@ -14,6 +14,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::error::Error;
 use tower_http::trace::TraceLayer;
+use tracing::info;
 
 use crate::state::AppState;
 use crate::{
@@ -68,6 +69,7 @@ async fn handle_mutate(
     State(state): State<AppState>,
     Json(payload): Json<AdmissionReview<DynamicObject>>,
 ) -> impl IntoResponse {
+    info!("Received request: {:?}", payload);
     let req: AdmissionRequest<_> = match payload.try_into() {
         Ok(req) => req,
         Err(err) => {
