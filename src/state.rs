@@ -19,7 +19,7 @@ impl Default for InnerState {
     fn default() -> Self {
         InnerState {
             version: "default".to_string(),
-            key_manager: Box::new(NullKeyManager::default()) as Box<dyn KeyManager>,
+            key_manager: Box::<NullKeyManager>::default(),
             consul_settings: ConsulClientSettingsBuilder::default().build().unwrap(),
             tasker: Tasker::new(),
         }
