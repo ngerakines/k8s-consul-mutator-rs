@@ -24,7 +24,10 @@ use crate::{
 
 #[derive(Deserialize)]
 struct WatchRequest {
-    key: String,
+    pub namespace: String,
+    pub deployment: String,
+    pub config_key: String,
+    pub consul_key: String,
 }
 
 async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
@@ -37,7 +40,12 @@ async fn handle_watch(
 ) -> impl IntoResponse {
     let is_new_watch_res = state
         .key_manager
-        .watch(payload.key.clone())
+        .watch(
+            payload.namespace.clone(),
+            payload.deployment.clone(),
+            payload.config_key.clone(),
+            payload.consul_key.clone(),
+        )
         .await
         .map_err(|err| anyhow!(err.to_string()));
     if is_new_watch_res.is_err() {
@@ -52,7 +60,7 @@ async fn handle_watch(
         state.tasker.spawn(async move {
             check_key(
                 consul_config,
-                payload.key.clone(),
+                payload.consul_key.clone(),
                 "10s".to_string(),
                 tasker2.stopper(),
                 task_shared_state,
@@ -120,14 +128,24 @@ async fn mutate(
             continue;
         }
 
+        let found_key_value = obj.annotations().get(found_key.as_str()).unwrap();
+
+        state
+            .key_manager
+            .watch(
+                obj.namespace().unwrap(),
+                obj.name_any().clone(),
+                key.clone(),
+                found_key_value.clone(),
+            )
+            .await?;
+
         if obj.metadata.annotations.is_none() {
             patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
                 path: "/metadata/annotations".into(),
                 value: serde_json::Value::Object(serde_json::Map::new()),
             }));
         }
-
-        state.key_manager.watch(key.clone()).await?;
 
         let checksum = state.key_manager.get(key.clone()).await?;
         if checksum.is_some() {
