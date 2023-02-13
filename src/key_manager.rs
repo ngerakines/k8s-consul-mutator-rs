@@ -243,5 +243,122 @@ mod tests {
                 .await;
             assert!(watch_res3.is_err());
         }
+        {
+            let results = key_manager
+                .subscriptions_for_deployment("default".to_string(), "app-foo".to_string())
+                .await;
+            assert!(results.is_ok());
+            let subscriptions = results.unwrap();
+            assert_eq!(subscriptions.len(), 1);
+            assert_eq!(
+                subscriptions,
+                vec![Subscription {
+                    namespace: "default".to_string(),
+                    deployment: "app-foo".to_string(),
+                    config_key: "config".to_string(),
+                }]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn memory_key_manager_unwatch_deployment() {
+        let key_manager = Box::new(MemoryKeyManager::default()) as Box<dyn KeyManager>;
+        key_manager
+            .watch(
+                "default".to_string(),
+                "app-foo".to_string(),
+                "config".to_string(),
+                "config".to_string(),
+            )
+            .await
+            .expect("watch should succeed");
+
+        assert_eq!(
+            key_manager
+                .subscriptions_for_deployment("default".to_string(), "app-foo".to_string())
+                .await
+                .expect("watch should succeed")
+                .len(),
+            1
+        );
+
+        key_manager
+            .unwatch_deployment("default".to_string(), "app-foo".to_string())
+            .await
+            .expect("watch should succeed");
+
+        assert_eq!(
+            key_manager
+                .subscriptions_for_deployment("default".to_string(), "app-foo".to_string())
+                .await
+                .expect("watch should succeed")
+                .len(),
+            0
+        );
+    }
+
+    #[tokio::test]
+    async fn memory_key_manager_unwatch_namespace() {
+        let key_manager = Box::new(MemoryKeyManager::default()) as Box<dyn KeyManager>;
+        key_manager
+            .watch(
+                "default".to_string(),
+                "app-foo".to_string(),
+                "config".to_string(),
+                "config".to_string(),
+            )
+            .await
+            .expect("watch should succeed");
+
+        key_manager
+            .watch(
+                "secondary".to_string(),
+                "app-bar".to_string(),
+                "config".to_string(),
+                "config".to_string(),
+            )
+            .await
+            .expect("watch should succeed");
+
+        assert_eq!(
+            key_manager
+                .subscriptions_for_deployment("default".to_string(), "app-foo".to_string())
+                .await
+                .expect("watch should succeed")
+                .len(),
+            1
+        );
+        assert_eq!(
+            key_manager
+                .subscriptions_for_deployment("secondary".to_string(), "app-bar".to_string())
+                .await
+                .expect("watch should succeed")
+                .len(),
+            1
+        );
+
+        key_manager
+            .unwatch_namespace("default".to_string())
+            .await
+            .expect("watch should succeed");
+
+        assert_eq!(
+            key_manager
+                .subscriptions_for_deployment("default".to_string(), "app-foo".to_string())
+                .await
+                .expect("watch should succeed")
+                .len(),
+            0
+        );
+
+        assert_eq!(
+            key_manager
+                .subscriptions_for_deployment("secondary".to_string(), "app-bar".to_string())
+                .await
+                .expect("watch should succeed")
+                .len(),
+            1
+        );
     }
 }
