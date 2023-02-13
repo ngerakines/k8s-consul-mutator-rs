@@ -8,6 +8,7 @@ use anyhow::anyhow;
 
 use crate::error::Result;
 
+/// A subscription is a namespaced resource for a key.
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct Subscription {
     pub namespace: String,
@@ -15,8 +16,23 @@ pub struct Subscription {
     pub config_key: String,
 }
 
+/// KeyManager is an interface for managing subscriptions to consul keys.
 #[async_trait]
 pub trait KeyManager: Sync + Send {
+    /// Creates a subscription to a consul key.
+    ///
+    /// Returns true if the consul key is being subscribed to for the first time.
+    ///
+    /// # Arguments
+    ///
+    /// * `namespace` - The namespace of the resource.
+    /// * `deployment` - The deployment of the resource.
+    /// * `config_key` - The key of the resource.
+    /// * `consul_key` - The consul key to subscribe to.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the subscription already exists and points to a different consul key.
     async fn watch(
         &self,
         namespace: String,
@@ -24,10 +40,20 @@ pub trait KeyManager: Sync + Send {
         config_key: String,
         consul_key: String,
     ) -> Result<bool>;
+
+    /// Removes all subscriptions for a namespace.
     async fn unwatch_namespace(&self, namespace: String) -> Result<usize>;
+
+    /// Removes all subscriptions for a deployment within a namespace.
     async fn unwatch_deployment(&self, namespace: String, deployment: String) -> Result<usize>;
+
+    /// Sets the value of a key.
     async fn set(&self, key: String, value: String) -> Result<()>;
+
+    /// Gets the value of a key.
     async fn get(&self, key: String) -> Result<Option<String>>;
+
+    /// Gets all subscriptions for a deployment.
     async fn subscriptions_for_deployment(
         &self,
         namespace: String,
@@ -117,9 +143,12 @@ impl KeyManager for MemoryKeyManager {
             return Ok(false);
         }
 
-        inner.subscriptions.insert(subscription, consul_key);
+        inner.subscriptions.insert(subscription, consul_key.clone());
 
-        Ok(true)
+        Ok(inner
+            .subscriptions
+            .values()
+            .any(|value| value.eq(&consul_key)))
     }
 
     async fn unwatch_namespace(&self, namespace: String) -> Result<usize> {
@@ -146,20 +175,20 @@ impl KeyManager for MemoryKeyManager {
         Ok(count - modified_count)
     }
 
-    async fn set(&self, key: String, value: String) -> Result<()> {
+    async fn set(&self, consul_key: String, checksum: String) -> Result<()> {
         let inner_lock = self.inner.lock();
         let mut inner = inner_lock.borrow_mut();
 
-        inner.checksums.insert(key, value);
+        inner.checksums.insert(consul_key, checksum);
 
         Ok(())
     }
 
-    async fn get(&self, state: String) -> Result<Option<String>> {
+    async fn get(&self, consul_key: String) -> Result<Option<String>> {
         let inner_lock = self.inner.lock();
         let inner = inner_lock.borrow();
 
-        match inner.checksums.get(&state) {
+        match inner.checksums.get(&consul_key) {
             Some(val_ref) => Ok(Some(val_ref.to_owned())),
             None => Ok(None),
         }

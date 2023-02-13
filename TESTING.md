@@ -27,15 +27,16 @@ In another terminal start:
 
 4. Build and push the container.
 
-    $ docker build --build-arg GIT_HASH=`git rev-parse HEAD` -t localhost:5000/k8s-consul-mutator-rs:latest .
-    $ docker push localhost:5000/k8s-consul-mutator-rs:latest
+    $ docker build --build-arg GIT_HASH=`git rev-parse HEAD` -t localhost:5000/k8s-consul-mutator-rs:`git rev-parse HEAD` .
+    $ docker push localhost:5000/k8s-consul-mutator-rs:`git rev-parse HEAD`
 
 5. Prepare the k8s-consul-mutator-rs namespace and resources
 
     $ minikube kubectl -- create ns k8s-consul-mutator-rs
-    $ minikube kubectl -- create secret tls validation-webhook -n kong --key "${TMPDIR}"/tls.key --cert "${TMPDIR}"/tls.crt
 
 6. Create the k8s-consul-mutator-rs deployment and verify it is running
+
+First, update the `CONSUL_HTTP_ADDR` environment variable value in `minikube_deployment.yaml` to point to your consul server.
 
     $ minikube kubectl -- apply -f minikube_deployment.yaml
     $ minikube kubectl -- get all -n k8s-consul-mutator-rs

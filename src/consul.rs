@@ -9,7 +9,7 @@ use std::error::Error;
 use crate::state::AppState;
 use tokio::time::{sleep, Duration};
 use tokio_tasker::Stopper;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub async fn check_key(
     consul_config: ConsulClientSettings,
@@ -18,11 +18,16 @@ pub async fn check_key(
     stopper: Stopper,
     app_state: AppState,
 ) {
-    let consul_client = ConsulClient::new(consul_config).unwrap();
+    debug!("watch {consul_key} starting");
+    let consul_client_maybe = ConsulClient::new(consul_config);
+    if let Err(ref error) = consul_client_maybe {
+        error!("watch {consul_key} error: {error}");
+        return;
+    }
+    let consul_client = consul_client_maybe.unwrap();
 
     let mut key_index = 0;
 
-    debug!("watch {consul_key} starting");
     while !stopper.is_stopped() {
         debug!("{consul_key} {key_index} loop");
         let wait_res = kv::read(

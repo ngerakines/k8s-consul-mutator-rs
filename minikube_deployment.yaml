@@ -24,11 +24,16 @@ spec:
         - name: app
           image: "localhost:5000/k8s-consul-mutator-rs:latest"
           imagePullPolicy: Always
+          restartPolicy: Never
           env:
           - name: CERTIFICATE
             value: /etc/ssl/certs/k8s-consul-mutator-rs.pem
           - name: CERTIFICATE_KEY
             value: /etc/ssl/certs/k8s-consul-mutator-rs.key
+          - name: CONSUL_HTTP_ADDR
+            value: "http://consul.consul.svc:8500"
+          - name: RUST_LOG
+            value: k8s_consul_mutator_rs=debug,tower_http=debug
           ports:
             - name: http
               containerPort: 8080

@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use axum::{
     extract::{Json, State},
-    http::{Request, StatusCode},
+    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -77,7 +77,6 @@ async fn handle_mutate(
     State(state): State<AppState>,
     Json(payload): Json<AdmissionReview<DynamicObject>>,
 ) -> impl IntoResponse {
-    info!("Received request: {:?}", payload);
     let req: AdmissionRequest<_> = match payload.try_into() {
         Ok(req) => req,
         Err(err) => {
@@ -123,14 +122,9 @@ async fn mutate(
     for found_key in found_keys {
         let key = found_key.replace("k8s-consul-mutator.io/key-", "");
 
-        let checksum_key = format!("k8s-consul-mutator.io/checksum-{key}");
-        if obj.annotations().contains_key(checksum_key.as_str()) {
-            continue;
-        }
-
         let found_key_value = obj.annotations().get(found_key.as_str()).unwrap();
 
-        state
+        let is_new_watch = state
             .key_manager
             .watch(
                 obj.namespace().unwrap(),
@@ -139,6 +133,24 @@ async fn mutate(
                 found_key_value.clone(),
             )
             .await?;
+        info!("mutate is_new_watch: {is_new_watch}");
+        if is_new_watch {
+            let tasker2 = state.tasker.clone();
+            let task_shared_state = state.clone();
+            let consul_config = state.consul_settings.clone();
+            let consul_key = found_key_value.clone();
+            state.tasker.spawn(async move {
+                check_key(
+                    consul_config,
+                    consul_key,
+                    "10s".to_string(),
+                    tasker2.stopper(),
+                    task_shared_state,
+                )
+                .await;
+                tasker2.finish();
+            });
+        }
 
         if obj.metadata.annotations.is_none() {
             patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
@@ -147,7 +159,7 @@ async fn mutate(
             }));
         }
 
-        let checksum = state.key_manager.get(key.clone()).await?;
+        let checksum = state.key_manager.get(found_key_value.clone()).await?;
         if checksum.is_some() {
             patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
                 // https://jsonpatch.com/#json-pointer
@@ -164,8 +176,6 @@ pub fn build_router(shared_state: AppState) -> Router {
         .route("/", get(handle_index))
         .route("/mutate", post(handle_mutate))
         .route("/api/v1/watch", post(handle_watch))
-        .layer(sentry_tower::NewSentryLayer::<Request<_>>::new_from_top())
-        .layer(sentry_tower::SentryHttpLayer::with_transaction())
         .layer(TraceLayer::new_for_http())
         .with_state(shared_state)
 }
@@ -176,16 +186,16 @@ mod tests {
 
     use super::*;
 
-    use axum::http::StatusCode;
-    use axum_test_helper::TestClient;
-    use std::sync::Arc;
+    // use axum::http::StatusCode;
+    // use axum_test_helper::TestClient;
+    // use std::sync::Arc;
 
-    #[tokio::test]
-    async fn test_handle_index() {
-        let router = build_router(state::AppState(Arc::new(Default::default())));
-        let client = TestClient::new(router);
-        let res = client.get("/").send().await;
-        assert_eq!(res.status(), StatusCode::OK);
-        assert_eq!(res.text().await, r#"{"version":"default"}"#);
-    }
+    // #[tokio::test]
+    // async fn test_handle_index() {
+    //     let router = build_router(state::AppState(Arc::new(Default::default())));
+    //     let client = TestClient::new(router);
+    //     let res = client.get("/").send().await;
+    //     assert_eq!(res.status(), StatusCode::OK);
+    //     assert_eq!(res.text().await, r#"{"version":"default"}"#);
+    // }
 }

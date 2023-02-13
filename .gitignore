@@ -1,1 +1,4 @@
 /target
+.local.env
+k8s-consul-mutator-rs.key
+k8s-consul-mutator-rs.pem

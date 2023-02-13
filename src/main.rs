@@ -2,7 +2,6 @@ use std::{env, sync::Arc};
 
 use axum_server::{tls_rustls::RustlsConfig, Handle};
 use consulrs::client::ConsulClientSettingsBuilder;
-use sentry_tracing::EventFilter;
 use std::net::SocketAddr;
 use tokio::sync::broadcast;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -24,22 +23,7 @@ use tokio_tasker::Tasker;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let environment: String = env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
-
     let version = option_env!("GIT_HASH").unwrap_or(env!("CARGO_PKG_VERSION", "develop"));
-
-    let _guard = sentry::init(sentry::ClientOptions {
-        debug: environment != "production",
-        environment: Some(environment.clone().into()),
-        release: Some(std::borrow::Cow::Borrowed(version)),
-        attach_stacktrace: true,
-        ..sentry::ClientOptions::default()
-    });
-
-    let layer = sentry_tracing::layer().event_filter(|md| match md.level() {
-        &tracing::Level::ERROR => EventFilter::Event,
-        _ => EventFilter::Ignore,
-    });
 
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let secure_port = env::var("SECURE_PORT").unwrap_or_else(|_| "8443".to_string());
@@ -50,7 +34,6 @@ async fn main() -> Result<()> {
                 .unwrap_or_else(|_| "k8s_consul_mutator_rs=debug,tower_http=debug".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
-        .with(layer)
         .init();
 
     let tasker = Tasker::new();
@@ -65,8 +48,11 @@ async fn main() -> Result<()> {
     if let Ok(consul_address) = env::var("CONSUL_ADDRESS") {
         consul_config_builder.address(consul_address);
     }
+    info!(
+        "consul config {:#?}",
+        consul_config_builder.build().unwrap()
+    );
 
-    // let notify = Arc::new(Barrier::new());
     let (shutdown_tx, _) = broadcast::channel(1);
 
     let ctrl_c = async {
@@ -111,6 +97,7 @@ async fn main() -> Result<()> {
             panic!("No server to start");
         }
 
+        info!("getting insecure_server placeholder");
         let insecure_server = match start_insecure_server {
             true => {
                 debug!("starting insecure server");
@@ -126,6 +113,7 @@ async fn main() -> Result<()> {
             false => std::future::pending().await,
         };
 
+        info!("getting secure_server placeholder");
         let secure_server = match start_secure_server {
             true => {
                 let tls_config =
@@ -163,9 +151,7 @@ async fn main() -> Result<()> {
         info!("signal received, starting graceful shutdown");
 
         shutdown_tx.send(true).unwrap();
-        info!("shutdown signal sent");
         state_tasker.finish();
-        info!("state tasker finished");
     }
 
     let signaller = tasker.signaller();
