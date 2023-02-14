@@ -59,6 +59,8 @@ pub trait KeyManager: Sync + Send {
         namespace: String,
         deployment: String,
     ) -> Result<Vec<Subscription>>;
+
+    async fn subscriptions_for_consul_key(&self, consul_key: String) -> Result<Vec<Subscription>>;
 }
 
 pub struct NullKeyManager;
@@ -102,6 +104,10 @@ impl KeyManager for NullKeyManager {
         _namespace: String,
         _deployment: String,
     ) -> Result<Vec<Subscription>> {
+        Ok(vec![])
+    }
+
+    async fn subscriptions_for_consul_key(&self, _consul_key: String) -> Result<Vec<Subscription>> {
         Ok(vec![])
     }
 }
@@ -206,6 +212,21 @@ impl KeyManager for MemoryKeyManager {
 
         for subscription in inner.subscriptions.iter() {
             if subscription.0.namespace == namespace && subscription.0.deployment == deployment {
+                results.push(subscription.0.clone());
+            }
+        }
+
+        Ok(results)
+    }
+
+    async fn subscriptions_for_consul_key(&self, consul_key: String) -> Result<Vec<Subscription>> {
+        let inner_lock = self.inner.lock();
+        let inner = inner_lock.borrow_mut();
+
+        let mut results = vec![];
+
+        for subscription in inner.subscriptions.iter() {
+            if subscription.1 == &consul_key {
                 results.push(subscription.0.clone());
             }
         }

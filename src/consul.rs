@@ -1,3 +1,4 @@
+use chrono::Utc;
 use consulrs::{
     api::{features::Blocking, kv::requests::ReadKeyRequest, Features},
     client::{ConsulClient, ConsulClientSettings},
@@ -6,7 +7,7 @@ use consulrs::{
 use std::convert::TryInto;
 use std::error::Error;
 
-use crate::state::AppState;
+use crate::state::{AppState, Work};
 use tokio::time::{sleep, Duration};
 use tokio_tasker::Stopper;
 use tracing::{debug, error, info, warn};
@@ -97,7 +98,37 @@ pub async fn check_key(
             .await
         {
             warn!("watch {consul_key} error: {err}");
+            continue;
         }
+
+        let subscribers_res = app_state
+            .key_manager
+            .subscriptions_for_consul_key(consul_key.clone())
+            .await;
+        if let Err(err) = subscribers_res {
+            warn!("watch {consul_key} error: {err}");
+            continue;
+        }
+        let subscribers = subscribers_res.unwrap();
+
+        let now = Utc::now();
+
+        for subscriber in subscribers {
+            info!("watch {consul_key} notifying {:?}", subscriber);
+
+            if let Err(err) = app_state
+                .tx
+                .send(Work {
+                    namespace: subscriber.namespace.clone(),
+                    deployment: subscriber.deployment.clone(),
+                    occurred: now,
+                })
+                .await
+            {
+                warn!("watch {consul_key} error: {err}");
+            }
+        }
+
         info!("watch {consul_key} looping");
     }
     info!("watch {consul_key} stopping");

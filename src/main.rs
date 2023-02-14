@@ -1,9 +1,9 @@
-use std::{env, sync::Arc};
+use std::{borrow::BorrowMut, env, sync::Arc};
 
 use axum_server::{tls_rustls::RustlsConfig, Handle};
 use consulrs::client::ConsulClientSettingsBuilder;
 use std::net::SocketAddr;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use tokio::signal;
@@ -14,6 +14,7 @@ mod consul;
 mod error;
 mod key_manager;
 mod state;
+mod updater;
 
 use api::build_router;
 use error::Result;
@@ -21,12 +22,24 @@ use key_manager::{KeyManager, MemoryKeyManager, NullKeyManager};
 
 use tokio_tasker::Tasker;
 
+use crate::{state::Work, updater::update_loop};
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let version = option_env!("GIT_HASH").unwrap_or(env!("CARGO_PKG_VERSION", "develop"));
 
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
     let secure_port = env::var("SECURE_PORT").unwrap_or_else(|_| "8443".to_string());
+
+    let cerificate = env::var("CERTIFICATE").ok();
+    let cerificate_key = env::var("CERTIFICATE_KEY").ok();
+    let start_secure_server =
+        secure_port != "0" && cerificate.is_some() && cerificate_key.is_some();
+    let start_insecure_server = port != "0";
+
+    if !start_secure_server && !start_insecure_server {
+        panic!("one or both of PORT and SECURE_PORT must be set to a non-zero value");
+    }
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
@@ -73,29 +86,33 @@ async fn main() -> Result<()> {
     let terminate = std::future::pending::<()>();
 
     {
+        let (updater_tx, mut updater_rx) = mpsc::channel::<Work>(5);
+
         let state_tasker = tasker.clone();
         let shared_state = state::AppState(Arc::new(state::InnerState::new(
             version.to_string(),
             key_manager,
             consul_config_builder.build().unwrap(),
             state_tasker.clone(),
+            updater_tx.clone(),
         )));
 
-        let app = build_router(shared_state.clone());
+        {
+            let update_loop_stopper = tasker.stopper();
+            let update_loop_shared_state = shared_state.clone();
 
-        let cerificate = env::var("CERTIFICATE").ok();
-        let cerificate_key = env::var("CERTIFICATE_KEY").ok();
-
-        debug!("secure_port {secure_port}");
-        debug!("port {port}");
-
-        let start_secure_server =
-            secure_port != "0" && cerificate.is_some() && cerificate_key.is_some();
-        let start_insecure_server = port != "0";
-
-        if !start_secure_server && !start_insecure_server {
-            panic!("No server to start");
+            tasker.spawn(async move {
+                let update_loop_rx = updater_rx.borrow_mut();
+                update_loop(
+                    update_loop_shared_state,
+                    update_loop_stopper,
+                    update_loop_rx,
+                )
+                .await;
+            });
         }
+
+        let app = build_router(shared_state.clone());
 
         info!("getting insecure_server placeholder");
         let insecure_server = match start_insecure_server {
@@ -144,7 +161,7 @@ async fn main() -> Result<()> {
         tokio::select! {
             _ = ctrl_c => {},
             _ = terminate => {},
-            _ = insecure_server => {},
+                        _ = insecure_server => {},
             _ = secure_server => {},
         }
 

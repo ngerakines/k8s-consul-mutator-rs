@@ -1,9 +1,19 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::key_manager::{KeyManager, NullKeyManager};
-use consulrs::client::{ConsulClientSettings, ConsulClientSettingsBuilder};
+use crate::key_manager::KeyManager;
+use chrono::{DateTime, Utc};
+use consulrs::client::ConsulClientSettings;
+use tokio::sync::mpsc::Sender;
 use tokio_tasker::Tasker;
+
+/// A subscription is a namespaced resource for a key.
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+pub struct Work {
+    pub namespace: String,
+    pub deployment: String,
+    pub occurred: DateTime<Utc>,
+}
 
 #[derive(Clone)]
 pub struct AppState(pub Arc<InnerState>);
@@ -13,17 +23,7 @@ pub struct InnerState {
     pub key_manager: Box<dyn KeyManager>,
     pub consul_settings: ConsulClientSettings,
     pub tasker: Tasker,
-}
-
-impl Default for InnerState {
-    fn default() -> Self {
-        InnerState {
-            version: "default".to_string(),
-            key_manager: Box::<NullKeyManager>::default(),
-            consul_settings: ConsulClientSettingsBuilder::default().build().unwrap(),
-            tasker: Tasker::new(),
-        }
-    }
+    pub tx: Sender<Work>,
 }
 
 impl InnerState {
@@ -32,12 +32,14 @@ impl InnerState {
         key_manager: Box<dyn KeyManager>,
         consul_settings: ConsulClientSettings,
         tasker: Tasker,
+        tx: Sender<Work>,
     ) -> Self {
         Self {
             version,
             key_manager,
             consul_settings,
             tasker,
+            tx,
         }
     }
 }

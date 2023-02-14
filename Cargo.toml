@@ -15,6 +15,7 @@ anyhow = { version = "1.0.66", features = ["backtrace"] }
 async-trait = {version = "0.1"}
 axum = "0.6.6"
 axum-server = {version = "0.4.4", features = ["tls-rustls"]}
+chrono = "0.4.23"
 consulrs = { git = "https://github.com/ngerakines/consulrs.git", rev = "b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b" }
 futures-util = "0.3.17"
 json-patch = "0.3.0"
