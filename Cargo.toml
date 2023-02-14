@@ -15,7 +15,7 @@ anyhow = { version = "1.0.66", features = ["backtrace"] }
 async-trait = {version = "0.1"}
 axum = "0.6.6"
 axum-server = {version = "0.4.4", features = ["tls-rustls"]}
-consulrs = { git = "https://github.com/ngerakines/consulrs.git", rev = "1ce427baa7f58da9206a43c4068357014c8035a4" }
+consulrs = { git = "https://github.com/ngerakines/consulrs.git", rev = "b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b" }
 futures-util = "0.3.17"
 json-patch = "0.3.0"
 k8s-openapi = { version = "0.17.0", features = ["v1_26"] }

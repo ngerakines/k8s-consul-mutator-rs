@@ -226,7 +226,7 @@ dependencies = [
 [[package]]
 name = "consulrs"
 version = "0.1.0"
-source = "git+https://github.com/ngerakines/consulrs.git?rev=1ce427baa7f58da9206a43c4068357014c8035a4#1ce427baa7f58da9206a43c4068357014c8035a4"
+source = "git+https://github.com/ngerakines/consulrs.git?rev=b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b#b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b"
 dependencies = [
  "async-trait",
  "base64 0.21.0",
@@ -247,7 +247,7 @@ dependencies = [
 [[package]]
 name = "consulrs_derive"
 version = "0.1.0"
-source = "git+https://github.com/ngerakines/consulrs.git?rev=1ce427baa7f58da9206a43c4068357014c8035a4#1ce427baa7f58da9206a43c4068357014c8035a4"
+source = "git+https://github.com/ngerakines/consulrs.git?rev=b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b#b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b"
 dependencies = [
  "proc-macro2",
  "quote",
