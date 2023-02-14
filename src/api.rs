@@ -186,16 +186,16 @@ mod tests {
 
     use super::*;
 
-    // use axum::http::StatusCode;
-    // use axum_test_helper::TestClient;
-    // use std::sync::Arc;
+    use axum::http::StatusCode;
+    use axum_test_helper::TestClient;
+    use std::sync::Arc;
 
-    // #[tokio::test]
-    // async fn test_handle_index() {
-    //     let router = build_router(state::AppState(Arc::new(Default::default())));
-    //     let client = TestClient::new(router);
-    //     let res = client.get("/").send().await;
-    //     assert_eq!(res.status(), StatusCode::OK);
-    //     assert_eq!(res.text().await, r#"{"version":"default"}"#);
-    // }
+    #[tokio::test]
+    async fn test_handle_index() {
+        let router = build_router(state::AppState(Arc::new(Default::default())));
+        let client = TestClient::new(router);
+        let res = client.get("/").send().await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(res.text().await, r#"{"version":"default"}"#);
+    }
 }
