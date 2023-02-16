@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use consulrs::{
     api::{features::Blocking, kv::requests::ReadKeyRequest, Features},
     client::{ConsulClient, ConsulClientSettings},
@@ -8,7 +8,7 @@ use std::convert::TryInto;
 use std::error::Error;
 
 use crate::state::{AppState, Work};
-use tokio::time::{sleep, Duration};
+use tokio::time::sleep;
 use tokio_tasker::Stopper;
 use tracing::{debug, error, info, warn};
 
@@ -29,8 +29,27 @@ pub async fn check_key(
     let consul_client = consul_client_maybe.unwrap();
 
     let mut key_index = 0;
+    let mut stop_countdown: Option<DateTime<Utc>> = None;
 
     while !stopper.is_stopped() {
+        if app_state
+            .key_manager
+            .consul_key_subscriber_count(consul_key.clone())
+            .await
+            .unwrap()
+            == 0
+        {
+            if stop_countdown.is_none() {
+                warn!("consul key watcher preparing to stop:{consul_key}");
+                stop_countdown = Some(Utc::now() + Duration::seconds(60));
+            } else if Utc::now() > stop_countdown.unwrap() {
+                warn!("consul key watcher stopping because of inactivity:{consul_key}");
+                break;
+            }
+        } else {
+            stop_countdown = None;
+        }
+
         let wait_res = kv::read(
             &consul_client,
             &consul_key,
@@ -61,7 +80,7 @@ pub async fn check_key(
             } else {
                 error!("consul key watcher error: {consul_key}: {:?}", err);
             }
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::seconds(10).to_std().unwrap()).await;
             continue;
         }
 
@@ -69,7 +88,7 @@ pub async fn check_key(
 
         if wait_success.response.is_empty() {
             warn!("watch {consul_key} error: no keys returned from consul for key");
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::seconds(10).to_std().unwrap()).await;
             continue;
         }
 
@@ -83,7 +102,7 @@ pub async fn check_key(
 
         if kv.value.is_none() {
             warn!("consul key watcher error: {consul_key}: value option is none");
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::seconds(10).to_std().unwrap()).await;
             continue;
         }
 

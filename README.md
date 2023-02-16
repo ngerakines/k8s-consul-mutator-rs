@@ -43,8 +43,10 @@ Commits that were influenced by GitHub Copilot will have the `[copilot]` tag app
 - [X] Key manager for checksums
 - [X] Consul configuration at start
 - [X] Background workers for polling consul kv reads
-- [ ] Track kubernetes resources to update
-- [ ] Update kubernetes resources on consul kv change
+- [X] Track kubernetes resources to update
+- [X] Update kubernetes resources on consul kv change
+- [X] Stop consul watchers for keys that are no longer used
+- [ ] Start consul watchers for existing deployments
 - [ ] Support sha checksums
 - [ ] Support fnv checksums
 - [ ] Support consul key index values as checksums

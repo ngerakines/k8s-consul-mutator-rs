@@ -61,6 +61,8 @@ pub trait KeyManager: Sync + Send {
     ) -> Result<Vec<Subscription>>;
 
     async fn subscriptions_for_consul_key(&self, consul_key: String) -> Result<Vec<Subscription>>;
+
+    async fn consul_key_subscriber_count(&self, consul_key: String) -> Result<usize>;
 }
 
 pub struct NullKeyManager;
@@ -109,6 +111,10 @@ impl KeyManager for NullKeyManager {
 
     async fn subscriptions_for_consul_key(&self, _consul_key: String) -> Result<Vec<Subscription>> {
         Ok(vec![])
+    }
+
+    async fn consul_key_subscriber_count(&self, _consul_key: String) -> Result<usize> {
+        Ok(0)
     }
 }
 
@@ -232,6 +238,17 @@ impl KeyManager for MemoryKeyManager {
         }
 
         Ok(results)
+    }
+
+    async fn consul_key_subscriber_count(&self, consul_key: String) -> Result<usize> {
+        let inner_lock = self.inner.lock();
+        let inner = inner_lock.borrow_mut();
+
+        Ok(inner
+            .subscriptions
+            .values()
+            .filter(|p| p == &&consul_key)
+            .count())
     }
 }
 
