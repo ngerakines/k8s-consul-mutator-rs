@@ -9,24 +9,26 @@ use tracing::{debug, info};
 
 use crate::state::{AppState, Work};
 
-pub async fn update_loop(app_state: AppState, stopper: Stopper, rx: &mut Receiver<Work>) {
+pub async fn update_loop(_app_state: AppState, stopper: Stopper, rx: &mut Receiver<Work>) {
     let sleep = time::sleep(Duration::from_secs(1));
     tokio::pin!(sleep);
 
     let mut work: HashSet<Work> = HashSet::new();
+
+    info!("update worker starting");
 
     while !stopper.is_stopped() {
         tokio::select! {
             biased;
             r = rx.recv() => {
                 let val = r.unwrap();
-                debug!("got value: {:?}", val);
+                debug!("update worker got value: {:?}", val);
                 work.retain(|k| k.namespace != val.namespace && k.deployment != val.deployment);
                 work.insert(val);
             }
             () = &mut sleep => {
                 sleep.as_mut().reset(Instant::now() + Duration::from_secs(1));
-                debug!("timed out, resetting sleep");
+                debug!("update worker timed out, resetting sleep");
             }
         }
 
@@ -48,10 +50,9 @@ pub async fn update_loop(app_state: AppState, stopper: Stopper, rx: &mut Receive
         }
 
         for element in drained {
-            info!("removing element: {:?}", element);
+            debug!("update worker processing {:?}", element);
             work.remove(&element);
         }
-
-        debug!("update loop tick");
     }
+    info!("update worker stopped");
 }

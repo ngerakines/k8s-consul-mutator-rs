@@ -15,7 +15,6 @@ use serde::Deserialize;
 use serde_json::json;
 use std::error::Error;
 use tower_http::trace::TraceLayer;
-use tracing::info;
 
 use crate::state::{AppState, Work};
 use crate::{
@@ -154,7 +153,6 @@ async fn mutate(
                 found_key_value.clone(),
             )
             .await?;
-        info!("mutate is_new_watch: {is_new_watch}");
         if is_new_watch {
             let tasker2 = state.tasker.clone();
             let task_shared_state = state.clone();

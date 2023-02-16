@@ -7,11 +7,12 @@ use tokio::sync::{broadcast, mpsc};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use tokio::signal;
-use tracing::{debug, info};
+use tracing::{error, info};
 
 mod api;
 mod consul;
 mod error;
+mod k8s;
 mod key_manager;
 mod state;
 mod updater;
@@ -22,7 +23,7 @@ use key_manager::{KeyManager, MemoryKeyManager, NullKeyManager};
 
 use tokio_tasker::Tasker;
 
-use crate::{state::Work, updater::update_loop};
+use crate::{k8s::deployment_watch, state::Work, updater::update_loop};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -108,31 +109,44 @@ async fn main() -> Result<()> {
                     update_loop_stopper,
                     update_loop_rx,
                 )
-                .await;
+                .await
+            });
+        }
+
+        {
+            let deployment_watcher_stopper = tasker.stopper();
+            let deployment_watcher_state = shared_state.clone();
+
+            tasker.spawn(async move {
+                let hmmm = deployment_watcher_state.clone();
+                let watch = deployment_watch(hmmm, deployment_watcher_stopper).await;
+                if let Err(err) = watch {
+                    error!("deployment watch failed: {}", err);
+                }
             });
         }
 
         let app = build_router(shared_state.clone());
 
-        info!("getting insecure_server placeholder");
         let insecure_server = match start_insecure_server {
             true => {
-                debug!("starting insecure server");
+                info!("insecure server starting");
                 let mut insecure_notify = shutdown_tx.subscribe();
                 axum::Server::bind(&format!("0.0.0.0:{port}").parse().unwrap())
                     .serve(app.clone().into_make_service())
                     .with_graceful_shutdown(async move {
-                        debug!("waiting for insecure port to shutdown");
+                        info!("insecure server waiting on shutdown");
                         insecure_notify.recv().await.unwrap();
-                        debug!("insecure port shutdown");
+                        info!("insecure server shutdown");
                     })
             }
             false => std::future::pending().await,
         };
 
-        info!("getting secure_server placeholder");
         let secure_server = match start_secure_server {
             true => {
+                info!("secure server starting");
+
                 let tls_config =
                     RustlsConfig::from_pem_file(cerificate.unwrap(), cerificate_key.unwrap())
                         .await
@@ -145,10 +159,10 @@ async fn main() -> Result<()> {
                 let mut secure_notify = shutdown_tx.subscribe();
                 let shutdown_handler = handle.clone();
                 tokio::spawn(async move {
-                    debug!("waiting for secure port to shutdown");
+                    info!("secure server waiting on shutdown");
                     secure_notify.recv().await.unwrap();
                     handle.shutdown();
-                    debug!("secure port shutdown");
+                    info!("secure server shutdown");
                 });
 
                 axum_server::bind_rustls(addr, tls_config)
@@ -161,7 +175,7 @@ async fn main() -> Result<()> {
         tokio::select! {
             _ = ctrl_c => {},
             _ = terminate => {},
-                        _ = insecure_server => {},
+            _ = insecure_server => {},
             _ = secure_server => {},
         }
 
@@ -173,12 +187,12 @@ async fn main() -> Result<()> {
 
     let signaller = tasker.signaller();
     if signaller.stop() {
-        debug!("Stopping background tasks");
+        info!("stopping tasks");
     }
 
     tasker.join().await;
 
-    debug!("Shutdown complete");
+    info!("shutdown complete");
 
     Ok(())
 }

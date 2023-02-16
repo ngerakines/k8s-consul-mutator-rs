@@ -19,6 +19,7 @@ spec:
       labels:
         app: k8s-consul-mutator-rs
     spec:
+      serviceAccountName: k8s-consul-mutator-rs
       terminationGracePeriodSeconds: 90
       containers:
         - name: app
