@@ -35,7 +35,10 @@ pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(
                         .unwatch_deployment(namespace.clone().unwrap(), name)
                         .await
                     {
-                        error!("kubernetes deployment watcher error: failed to unwatch deployment: {}", err);
+                        error!(
+                            "kubernetes deployment watcher error: failed to unwatch deployment: {}",
+                            err
+                        );
                     }
                 }
             }
@@ -52,7 +55,10 @@ pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(
                         )
                         .await
                     {
-                        error!("kubernetes deployment watcher error: failed to watch deployment: {}", err);
+                        error!(
+                            "kubernetes deployment watcher error: failed to watch deployment: {}",
+                            err
+                        );
                     }
                 }
             }

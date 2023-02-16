@@ -128,55 +128,57 @@ async fn main() -> Result<()> {
 
         let app = build_router(shared_state.clone());
 
-        let insecure_server = match start_insecure_server {
-            true => {
+        if start_insecure_server {
+            let mut insecure_notify = shutdown_tx.subscribe();
+            let insecure_app = app.clone();
+            tasker.spawn(async move {
                 info!("insecure server starting");
-                let mut insecure_notify = shutdown_tx.subscribe();
                 axum::Server::bind(&format!("0.0.0.0:{port}").parse().unwrap())
-                    .serve(app.clone().into_make_service())
+                    .serve(insecure_app.into_make_service())
                     .with_graceful_shutdown(async move {
                         info!("insecure server waiting on shutdown");
                         insecure_notify.recv().await.unwrap();
                         info!("insecure server shutdown");
                     })
-            }
-            false => std::future::pending().await,
-        };
+                    .await
+                    .unwrap();
+            });
+        }
 
-        let secure_server = match start_secure_server {
-            true => {
-                info!("secure server starting");
+        if start_secure_server {
+            info!("secure server starting");
 
-                let tls_config =
-                    RustlsConfig::from_pem_file(cerificate.unwrap(), cerificate_key.unwrap())
-                        .await
-                        .unwrap();
+            let tls_config =
+                RustlsConfig::from_pem_file(cerificate.unwrap(), cerificate_key.unwrap())
+                    .await
+                    .unwrap();
 
-                let addr = SocketAddr::from(([0, 0, 0, 0], secure_port.parse::<u16>().unwrap()));
+            let addr = SocketAddr::from(([0, 0, 0, 0], secure_port.parse::<u16>().unwrap()));
 
-                let handle = Handle::new();
+            let handle = Handle::new();
 
-                let mut secure_notify = shutdown_tx.subscribe();
-                let shutdown_handler = handle.clone();
-                tokio::spawn(async move {
-                    info!("secure server waiting on shutdown");
-                    secure_notify.recv().await.unwrap();
-                    handle.shutdown();
-                    info!("secure server shutdown");
-                });
+            let mut secure_notify = shutdown_tx.subscribe();
+            let shutdown_handler = handle.clone();
+            tokio::spawn(async move {
+                info!("secure server waiting on shutdown");
+                secure_notify.recv().await.unwrap();
+                handle.shutdown();
+                info!("secure server shutdown");
+            });
 
+            let secure_app = app.clone();
+            tasker.spawn(async move {
                 axum_server::bind_rustls(addr, tls_config)
                     .handle(shutdown_handler)
-                    .serve(app.clone().into_make_service())
-            }
-            false => std::future::pending().await,
-        };
+                    .serve(secure_app.into_make_service())
+                    .await
+                    .unwrap();
+            });
+        }
 
         tokio::select! {
             _ = ctrl_c => {},
             _ = terminate => {},
-            _ = insecure_server => {},
-            _ = secure_server => {},
         }
 
         info!("signal received, starting graceful shutdown");

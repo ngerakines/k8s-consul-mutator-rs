@@ -54,7 +54,10 @@ pub async fn check_key(
 
         if let Err(err) = wait_res {
             if let Some(source) = err.source() {
-                error!("consul key watcher error: {consul_key}: {:?} - {:?}", err, source);
+                error!(
+                    "consul key watcher error: {consul_key}: {:?} - {:?}",
+                    err, source
+                );
             } else {
                 error!("consul key watcher error: {consul_key}: {:?}", err);
             }
@@ -114,7 +117,10 @@ pub async fn check_key(
         let now = Utc::now();
 
         for subscriber in subscribers {
-            warn!("consul key watcher notifying: {consul_key} {:?}", subscriber);
+            warn!(
+                "consul key watcher notifying: {consul_key} {:?}",
+                subscriber
+            );
 
             if let Err(err) = app_state
                 .tx
