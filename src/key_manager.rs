@@ -65,6 +65,12 @@ pub trait KeyManager: Sync + Send {
     async fn consul_key_subscriber_count(&self, consul_key: String) -> Result<usize>;
 
     async fn consul_keys(&self) -> Result<Vec<String>>;
+
+    async fn deployment_annotations(
+        &self,
+        namespace: String,
+        deployment: String,
+    ) -> Result<HashMap<String, String>>;
 }
 
 pub struct NullKeyManager;
@@ -121,6 +127,14 @@ impl KeyManager for NullKeyManager {
 
     async fn consul_keys(&self) -> Result<Vec<String>> {
         Ok(vec![])
+    }
+
+    async fn deployment_annotations(
+        &self,
+        _namespace: String,
+        _deployment: String,
+    ) -> Result<HashMap<String, String>> {
+        Ok(HashMap::new())
     }
 }
 
@@ -265,6 +279,27 @@ impl KeyManager for MemoryKeyManager {
         results.extend(inner.subscriptions.values().cloned());
 
         Ok(results.into_iter().collect())
+    }
+
+    async fn deployment_annotations(
+        &self,
+        namespace: String,
+        deployment: String,
+    ) -> Result<HashMap<String, String>> {
+        let inner_lock = self.inner.lock();
+        let inner = inner_lock.borrow_mut();
+
+        let mut results = HashMap::new();
+
+        for subscription in inner.subscriptions.iter() {
+            if subscription.0.namespace == namespace && subscription.0.deployment == deployment {
+                if let Some(value) = inner.checksums.get(subscription.1) {
+                    results.insert(subscription.0.config_key.clone(), value.clone());
+                }
+            }
+        }
+
+        Ok(results)
     }
 }
 

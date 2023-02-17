@@ -98,19 +98,18 @@ async fn mutate(
             warn!("Error watching key: {err}");
         }
 
-        if obj.metadata.annotations.is_none() {
-            patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
-                path: "/metadata/annotations".into(),
-                value: serde_json::Value::Object(serde_json::Map::new()),
-            }));
-        }
-
         let checksum = state.key_manager.get(found_key_value.clone()).await?;
         if checksum.is_some() {
+            let checksum_value = checksum.unwrap();
             patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
-                // https://jsonpatch.com/#json-pointer
                 path: format!("/metadata/annotations/k8s-consul-mutator.io~1checksum-{key}"),
-                value: serde_json::Value::String(checksum.unwrap()),
+                value: serde_json::Value::String(checksum_value.clone()),
+            }));
+            patches.push(json_patch::PatchOperation::Add(json_patch::AddOperation {
+                path: format!(
+                    "/spec/template/metadata/annotations/k8s-consul-mutator.io~1checksum-{key}"
+                ),
+                value: serde_json::Value::String(checksum_value.clone()),
             }));
         }
     }
