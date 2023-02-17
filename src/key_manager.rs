@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::vec;
 
 use anyhow::anyhow;
@@ -63,6 +63,8 @@ pub trait KeyManager: Sync + Send {
     async fn subscriptions_for_consul_key(&self, consul_key: String) -> Result<Vec<Subscription>>;
 
     async fn consul_key_subscriber_count(&self, consul_key: String) -> Result<usize>;
+
+    async fn consul_keys(&self) -> Result<Vec<String>>;
 }
 
 pub struct NullKeyManager;
@@ -115,6 +117,10 @@ impl KeyManager for NullKeyManager {
 
     async fn consul_key_subscriber_count(&self, _consul_key: String) -> Result<usize> {
         Ok(0)
+    }
+
+    async fn consul_keys(&self) -> Result<Vec<String>> {
+        Ok(vec![])
     }
 }
 
@@ -249,6 +255,16 @@ impl KeyManager for MemoryKeyManager {
             .values()
             .filter(|p| p == &&consul_key)
             .count())
+    }
+
+    async fn consul_keys(&self) -> Result<Vec<String>> {
+        let inner_lock = self.inner.lock();
+        let inner = inner_lock.borrow_mut();
+
+        let mut results: HashSet<String> = HashSet::new();
+        results.extend(inner.subscriptions.values().cloned());
+
+        Ok(results.into_iter().collect())
     }
 }
 

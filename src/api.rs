@@ -11,86 +11,16 @@ use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, ResourceExt,
 };
-use serde::Deserialize;
 use serde_json::json;
 use std::error::Error;
 use tower_http::trace::TraceLayer;
+use tracing::warn;
 
-use crate::state::{AppState, Work};
-use crate::{
-    consul::check_key,
-    error::{ConMutError, Result},
-};
-
-#[derive(Deserialize)]
-struct WatchRequest {
-    pub namespace: String,
-    pub deployment: String,
-    pub config_key: String,
-    pub consul_key: String,
-}
+use crate::error::{ConMutError, Result};
+use crate::state::{AppState, ConsulWatch};
 
 async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
     Json(json!({"version": state.version}))
-}
-
-async fn handle_watch(
-    State(state): State<AppState>,
-    Json(payload): Json<WatchRequest>,
-) -> impl IntoResponse {
-    let is_new_watch_res = state
-        .key_manager
-        .watch(
-            payload.namespace.clone(),
-            payload.deployment.clone(),
-            payload.config_key.clone(),
-            payload.consul_key.clone(),
-        )
-        .await
-        .map_err(|err| anyhow!(err.to_string()));
-    if is_new_watch_res.is_err() {
-        return Json(json!({"error": is_new_watch_res.err().unwrap().to_string()}));
-    }
-    let is_new_watch = is_new_watch_res.unwrap();
-
-    if is_new_watch {
-        let tasker2 = state.tasker.clone();
-        let task_shared_state = state.clone();
-        let consul_config = state.consul_settings.clone();
-        state.tasker.spawn(async move {
-            check_key(
-                consul_config,
-                payload.consul_key.clone(),
-                "10s".to_string(),
-                tasker2.stopper(),
-                task_shared_state,
-            )
-            .await;
-            tasker2.finish();
-        });
-    }
-
-    Json(json!({ "created": is_new_watch }))
-}
-
-async fn handle_work(
-    State(state): State<AppState>,
-    Json(payload): Json<WatchRequest>,
-) -> impl IntoResponse {
-    let now = Utc::now();
-    if let Err(err) = state
-        .tx
-        .send(Work {
-            namespace: payload.namespace.clone(),
-            deployment: payload.deployment.clone(),
-            occurred: now,
-        })
-        .await
-    {
-        return Json(json!({ "ok": false, "message": err.to_string() }));
-    }
-
-    Json(json!({ "ok": true }))
 }
 
 async fn handle_mutate(
@@ -144,7 +74,7 @@ async fn mutate(
 
         let found_key_value = obj.annotations().get(found_key.as_str()).unwrap();
 
-        let is_new_watch = state
+        if let Err(err) = state
             .key_manager
             .watch(
                 obj.namespace().unwrap(),
@@ -152,23 +82,20 @@ async fn mutate(
                 key.clone(),
                 found_key_value.clone(),
             )
-            .await?;
-        if is_new_watch {
-            let tasker2 = state.tasker.clone();
-            let task_shared_state = state.clone();
-            let consul_config = state.consul_settings.clone();
-            let consul_key = found_key_value.clone();
-            state.tasker.spawn(async move {
-                check_key(
-                    consul_config,
-                    consul_key,
-                    "10s".to_string(),
-                    tasker2.stopper(),
-                    task_shared_state,
-                )
-                .await;
-                tasker2.finish();
-            });
+            .await
+            .map_err(|err| anyhow!(err.to_string()))
+        {
+            warn!("Error watching key: {err}");
+        }
+
+        let now = Utc::now();
+
+        if let Err(err) = state
+            .consul_manager_tx
+            .send(ConsulWatch::Create(found_key_value.clone(), now))
+            .await
+        {
+            warn!("Error watching key: {err}");
         }
 
         if obj.metadata.annotations.is_none() {
@@ -194,8 +121,6 @@ pub fn build_router(shared_state: AppState) -> Router {
     Router::new()
         .route("/", get(handle_index))
         .route("/mutate", post(handle_mutate))
-        .route("/api/v1/watch", post(handle_watch))
-        .route("/api/v1/work", post(handle_work))
         .layer(TraceLayer::new_for_http())
         .with_state(shared_state)
 }

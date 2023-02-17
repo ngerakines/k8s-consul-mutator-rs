@@ -5,17 +5,19 @@ use tokio::{
     time::{self, Instant},
 };
 use tokio_tasker::Stopper;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::state::{AppState, Work};
 
-pub async fn update_loop(_app_state: AppState, stopper: Stopper, rx: &mut Receiver<Work>) {
+pub async fn update_loop(app_state: AppState, stopper: Stopper, rx: &mut Receiver<Work>) {
     let sleep = time::sleep(Duration::from_secs(1));
     tokio::pin!(sleep);
 
     let mut work: HashSet<Work> = HashSet::new();
 
     info!("update worker starting");
+
+    let debounce_duration = chrono::Duration::seconds(app_state.settings.update_debounce as i64);
 
     while !stopper.is_stopped() {
         tokio::select! {
@@ -28,7 +30,7 @@ pub async fn update_loop(_app_state: AppState, stopper: Stopper, rx: &mut Receiv
             }
             () = &mut sleep => {
                 sleep.as_mut().reset(Instant::now() + Duration::from_secs(1));
-                debug!("update worker timed out, resetting sleep");
+                trace!("update worker timed out, resetting sleep");
             }
         }
 
@@ -40,7 +42,7 @@ pub async fn update_loop(_app_state: AppState, stopper: Stopper, rx: &mut Receiv
 
         let mut drained: Vec<Work> = vec![];
         for v in work.iter() {
-            if v.occurred < now - chrono::Duration::seconds(10) {
+            if v.occurred < now - debounce_duration {
                 drained.push(v.clone());
             }
         }

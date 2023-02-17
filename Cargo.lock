@@ -839,6 +839,7 @@ dependencies = [
  "backoff",
  "chrono",
  "consulrs",
+ "derive_builder",
  "futures",
  "futures-util",
  "json-patch",

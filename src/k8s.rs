@@ -27,6 +27,7 @@ pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(
     let deployment_watcher = watcher(api, ListParams::default()).try_for_each(|event| async {
         match event {
             kube::runtime::watcher::Event::Deleted(d) => {
+                // TODO: Don't unwatch deployments that aren't annotated.
                 let namespace = d.namespace();
                 let name = d.name_any();
                 if namespace.is_some() && !name.is_empty() {
@@ -43,6 +44,7 @@ pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(
                 }
             }
             kube::runtime::watcher::Event::Applied(d) => {
+                // TODO: Look for annotation removal and unwatch accordingly.
                 let subscriptions = subscriptions_from_deployment(&d).await;
                 for sub in subscriptions {
                     if let Err(err) = app_state
@@ -51,7 +53,7 @@ pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(
                             sub.namespace,
                             sub.deployment,
                             sub.config_key,
-                            sub.consul_key,
+                            sub.consul_key.clone(),
                         )
                         .await
                     {

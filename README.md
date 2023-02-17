@@ -2,6 +2,26 @@
 
 A Kubernetes mutating webhook that patches resources with checksums of consul keys.
 
+# Configuration
+
+This application uses the following environment variables:
+
+* `PORT`
+* `SECURE_PORT`
+* `CERTIFICATE`
+* `CERTIFICATE_KEY`
+* `CONSUL_HTTP_ADDR`
+* `CONSUL_HTTP_TOKEN`
+* `CONSUL_HTTP_SSL_VERIFY`
+
+Setting `PORT` to 0 disables the insecure (HTTP) interface. The default value is 8080.
+
+Setting `SECURE_PORT` to 0 disables the secure (HTTPS) interface. The default value is 8443.
+
+Both the `CERTIFICATE` and `CERTIFICATE_KEY` values must be set to file path values in order for the secure (HTTPS) interface to start.
+
+The `CONSUL_HTTP_ADDR` environment variable is used to configure which consul endpoint is used for key subscriptions. The default value is `http://127.0.0.1:8500`.
+
 # Usage
 
 This Kubernetes mutating webhook will write the checksum of a Consul key into into a resource annotation.
@@ -46,12 +66,12 @@ Commits that were influenced by GitHub Copilot will have the `[copilot]` tag app
 - [X] Track kubernetes resources to update
 - [X] Update kubernetes resources on consul kv change
 - [X] Stop consul watchers for keys that are no longer used
-- [ ] Start consul watchers for existing deployments
+- [X] Start consul watchers for existing deployments
 - [ ] Support sha checksums
 - [ ] Support fnv checksums
 - [ ] Support consul key index values as checksums
 - [ ] Populate background workers at startup
-- [ ] Configuration for consul tokens
+- [X] Configuration for consul tokens
 - [ ] Configuration for default checksum type
 - [ ] Configuration validation on start
 - [ ] Helm chart

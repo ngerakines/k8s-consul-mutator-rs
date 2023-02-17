@@ -10,6 +10,7 @@ use tokio::signal;
 use tracing::{error, info};
 
 mod api;
+mod config;
 mod consul;
 mod error;
 mod k8s;
@@ -23,7 +24,13 @@ use key_manager::{KeyManager, MemoryKeyManager, NullKeyManager};
 
 use tokio_tasker::Tasker;
 
-use crate::{k8s::deployment_watch, state::Work, updater::update_loop};
+use crate::{
+    config::SettingsBuilder,
+    consul::watch_dispatcher,
+    k8s::deployment_watch,
+    state::{ConsulWatch, Work},
+    updater::update_loop,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -58,10 +65,10 @@ async fn main() -> Result<()> {
         _ => Box::<NullKeyManager>::default() as Box<dyn KeyManager>,
     };
 
-    let mut consul_config_builder = ConsulClientSettingsBuilder::default();
-    if let Ok(consul_address) = env::var("CONSUL_ADDRESS") {
-        consul_config_builder.address(consul_address);
-    }
+    let settings_builder = SettingsBuilder::default();
+
+    let consul_config_builder = ConsulClientSettingsBuilder::default();
+
     info!(
         "consul config {:#?}",
         consul_config_builder.build().unwrap()
@@ -87,15 +94,18 @@ async fn main() -> Result<()> {
     let terminate = std::future::pending::<()>();
 
     {
-        let (updater_tx, mut updater_rx) = mpsc::channel::<Work>(5);
+        let (updater_tx, mut updater_rx) = mpsc::channel::<Work>(100);
+        let (watch_dispatcher_tx, mut watch_dispatcher_rx) = mpsc::channel::<ConsulWatch>(100);
 
         let state_tasker = tasker.clone();
         let shared_state = state::AppState(Arc::new(state::InnerState::new(
+            settings_builder.build().unwrap(),
             version.to_string(),
             key_manager,
             consul_config_builder.build().unwrap(),
             state_tasker.clone(),
             updater_tx.clone(),
+            watch_dispatcher_tx.clone(),
         )));
 
         {
@@ -111,6 +121,22 @@ async fn main() -> Result<()> {
                 )
                 .await
             });
+        }
+
+        {
+            let watch_dispatcher_stopper = tasker.stopper();
+            let watch_dispatcher_shared_state = shared_state.clone();
+
+            tasker.spawn(async move {
+                let inner_rx = watch_dispatcher_rx.borrow_mut();
+                watch_dispatcher(
+                    watch_dispatcher_stopper,
+                    watch_dispatcher_shared_state,
+                    inner_rx,
+                )
+                .await
+            });
+            // watch_dispatcher
         }
 
         {
