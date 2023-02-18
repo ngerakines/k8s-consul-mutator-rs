@@ -18,6 +18,13 @@ pub struct FullSubscription {
     pub consul_key: String,
 }
 
+/// This is the main loop that watches for deployment events in Kubernetes.
+/// When apply or delete events are received, deployments are watched and
+/// unwatched accordingly.
+///
+/// This does not notify the key manager of consul key subscription changes,
+/// but relies on the reconcile step to eventually create subscriptions that
+/// don't exist.
 pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(), anyhow::Error> {
     let client = Client::try_default().await.map_err(anyhow::Error::msg)?;
     let api = Api::<Deployment>::all(client.clone());

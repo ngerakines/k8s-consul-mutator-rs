@@ -18,6 +18,9 @@ use tracing::{debug, error, info, trace};
 
 use crate::state::{AppState, DeploymentUpdate};
 
+/// This is the main loop that publishes checksum changes to deployment
+/// resources in Kubernetes. It receives updates from the deployment watcher
+/// and then debounces them before applying them.
 pub async fn deployment_update_loop(
     app_state: AppState,
     stopper: Stopper,

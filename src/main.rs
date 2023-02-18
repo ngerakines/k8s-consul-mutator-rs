@@ -12,11 +12,11 @@ mod api;
 mod checksum;
 mod config;
 mod consul;
+mod deployment_updater;
 mod error;
 mod k8s;
 mod key_manager;
 mod state;
-mod deployment_updater;
 
 use api::build_router;
 use error::Result;
@@ -25,10 +25,10 @@ use crate::{
     checksum::get_checksummer,
     config::SettingsBuilder,
     consul::watch_dispatcher,
+    deployment_updater::deployment_update_loop,
     k8s::deployment_watch,
     key_manager::get_key_manager,
     state::{ConsulWatch, DeploymentUpdate},
-    deployment_updater::deployment_update_loop,
 };
 
 #[tokio::main]

@@ -15,6 +15,13 @@ use tokio::{
 use tokio_tasker::Stopper;
 use tracing::{debug, error, info, trace, warn};
 
+/// This function is used to watch for changes to a consul key. When key values
+/// do change, a checksum is generated, the key manager is updated, and a
+/// deployment update task is dispatched.
+///
+/// When the key manager has no subscribers, the watcher will idle for a period
+/// of time. If during that idle period there are still no subscribers, the
+/// function will notify the consul manager and exit.
 pub async fn check_key(
     consul_config: ConsulClientSettings,
     consul_key: String,
@@ -169,6 +176,10 @@ pub async fn check_key(
     info!("consul key watcher stopped: {consul_key}");
 }
 
+/// The consul dispatcher is responsible for managing the consul watches.
+///
+/// Periodically, it will reconcile the watches that are running with the
+/// consul keys that are associated with deployments that are not being watched.
 pub async fn watch_dispatcher(
     stopper: Stopper,
     app_state: AppState,
