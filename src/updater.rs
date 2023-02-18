@@ -16,9 +16,13 @@ use tokio::{
 use tokio_tasker::Stopper;
 use tracing::{debug, error, info, trace};
 
-use crate::state::{AppState, Work};
+use crate::state::{AppState, DeploymentUpdate};
 
-pub async fn update_loop(app_state: AppState, stopper: Stopper, rx: &mut Receiver<Work>) {
+pub async fn update_loop(
+    app_state: AppState,
+    stopper: Stopper,
+    rx: &mut Receiver<DeploymentUpdate>,
+) {
     let client = Client::try_default()
         .await
         .map_err(anyhow::Error::msg)
@@ -27,7 +31,7 @@ pub async fn update_loop(app_state: AppState, stopper: Stopper, rx: &mut Receive
     let sleep = time::sleep(Duration::from_secs(1));
     tokio::pin!(sleep);
 
-    let mut work: HashSet<Work> = HashSet::new();
+    let mut work: HashSet<DeploymentUpdate> = HashSet::new();
 
     info!("update worker starting");
 
@@ -54,7 +58,7 @@ pub async fn update_loop(app_state: AppState, stopper: Stopper, rx: &mut Receive
 
         let now = Utc::now();
 
-        let mut drained: Vec<Work> = vec![];
+        let mut drained: Vec<DeploymentUpdate> = vec![];
         for v in work.iter() {
             if v.occurred < now - debounce_duration {
                 let deployment_client: Api<Deployment> =

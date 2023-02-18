@@ -7,7 +7,7 @@ use consulrs::{
 use std::error::Error;
 use std::{collections::HashSet, convert::TryInto};
 
-use crate::state::{AppState, ConsulWatch, Work};
+use crate::state::{AppState, ConsulWatch, DeploymentUpdate};
 use tokio::{
     sync::mpsc::Receiver,
     time::{sleep, Instant},
@@ -128,7 +128,7 @@ pub async fn check_key(
             break;
         }
 
-        let key_content: Vec<u8> = kv.value.unwrap().try_into().unwrap_or_else(|_| Vec::new());
+        let key_content = kv.value.unwrap().try_into().unwrap_or(Vec::new());
         let digest = app_state.checksummer.checksum(key_content);
 
         debug!("consul key watcher checksum: {consul_key} {digest}");
@@ -154,8 +154,8 @@ pub async fn check_key(
             );
 
             if let Err(err) = app_state
-                .tx
-                .send(Work {
+                .deployment_update_tx
+                .send(DeploymentUpdate {
                     namespace: subscriber.namespace.clone(),
                     deployment: subscriber.deployment.clone(),
                     occurred: now,

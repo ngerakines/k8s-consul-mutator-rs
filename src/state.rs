@@ -9,7 +9,7 @@ use tokio_tasker::Tasker;
 
 /// A subscription is a namespaced resource for a key.
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
-pub struct Work {
+pub struct DeploymentUpdate {
     pub namespace: String,
     pub deployment: String,
     pub occurred: DateTime<Utc>,
@@ -29,7 +29,7 @@ pub struct InnerState {
     pub key_manager: Box<dyn KeyManager>,
     pub consul_settings: ConsulClientSettings,
     pub tasker: Tasker,
-    pub tx: Sender<Work>,
+    pub deployment_update_tx: Sender<DeploymentUpdate>,
     pub consul_manager_tx: Sender<ConsulWatch>,
     pub checksummer: Box<dyn Checksummer>,
 }
@@ -40,7 +40,7 @@ impl InnerState {
         key_manager: Box<dyn KeyManager>,
         consul_settings: ConsulClientSettings,
         tasker: Tasker,
-        tx: Sender<Work>,
+        deployment_update_tx: Sender<DeploymentUpdate>,
         consul_manager_tx: Sender<ConsulWatch>,
         checksummer: Box<dyn Checksummer>,
     ) -> Self {
@@ -49,7 +49,7 @@ impl InnerState {
             key_manager,
             consul_settings,
             tasker,
-            tx,
+            deployment_update_tx,
             consul_manager_tx,
             checksummer,
         }

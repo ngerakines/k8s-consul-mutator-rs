@@ -27,7 +27,7 @@ use crate::{
     consul::watch_dispatcher,
     k8s::deployment_watch,
     key_manager::get_key_manager,
-    state::{ConsulWatch, Work},
+    state::{ConsulWatch, DeploymentUpdate},
     updater::update_loop,
 };
 
@@ -79,7 +79,7 @@ async fn main() -> Result<()> {
     let terminate = std::future::pending::<()>();
 
     {
-        let (updater_tx, mut updater_rx) = mpsc::channel::<Work>(100);
+        let (updater_tx, mut updater_rx) = mpsc::channel::<DeploymentUpdate>(100);
         let (watch_dispatcher_tx, mut watch_dispatcher_rx) = mpsc::channel::<ConsulWatch>(100);
 
         let state_tasker = tasker.clone();
