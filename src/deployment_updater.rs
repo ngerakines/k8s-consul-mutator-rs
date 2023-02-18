@@ -18,7 +18,7 @@ use tracing::{debug, error, info, trace};
 
 use crate::state::{AppState, DeploymentUpdate};
 
-pub async fn update_loop(
+pub async fn deployment_update_loop(
     app_state: AppState,
     stopper: Stopper,
     rx: &mut Receiver<DeploymentUpdate>,

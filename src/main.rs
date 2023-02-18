@@ -16,7 +16,7 @@ mod error;
 mod k8s;
 mod key_manager;
 mod state;
-mod updater;
+mod deployment_updater;
 
 use api::build_router;
 use error::Result;
@@ -28,7 +28,7 @@ use crate::{
     k8s::deployment_watch,
     key_manager::get_key_manager,
     state::{ConsulWatch, DeploymentUpdate},
-    updater::update_loop,
+    deployment_updater::deployment_update_loop,
 };
 
 #[tokio::main]
@@ -99,7 +99,7 @@ async fn main() -> Result<()> {
 
             tasker.spawn(async move {
                 let update_loop_rx = updater_rx.borrow_mut();
-                update_loop(
+                deployment_update_loop(
                     update_loop_shared_state,
                     update_loop_stopper,
                     update_loop_rx,
