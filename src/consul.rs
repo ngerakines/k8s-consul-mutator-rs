@@ -134,7 +134,7 @@ pub async fn check_key(
         debug!("consul key watcher checksum: {consul_key} {:x}", digest);
         if let Err(err) = app_state
             .key_manager
-            .set(consul_key.clone(), format!("{:x}", digest))
+            .set(consul_key.clone(), format!("md5-{:x}", digest))
             .await
         {
             warn!("consul key watcher error: {consul_key}: {err}");
