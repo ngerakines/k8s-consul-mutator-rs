@@ -76,30 +76,52 @@ pub async fn deployment_update_loop(
                             .await;
 
                         if let Ok(annotations) = annotations_res {
-                            let mut transformed_annotations: HashMap<String, String> =
+                            let mut deployment_annotations: HashMap<String, String> =
                                 HashMap::new();
-                            for (k, v) in annotations.iter() {
-                                transformed_annotations.insert(
-                                    format!("k8s-consul-mutator.io/checksum-{k}"),
-                                    v.clone(),
+                            let mut deployment_spec_annotations: HashMap<String, String> =
+                                HashMap::new();
+
+                            if app_state.settings.set_deployment_annotations {
+                                for (k, v) in annotations.iter() {
+                                    deployment_annotations.insert(
+                                        format!("k8s-consul-mutator.io/checksum-{k}"),
+                                        v.clone(),
+                                    );
+                                }
+                            }
+                            if app_state.settings.set_deployment_timestamp {
+                                deployment_annotations.insert(
+                                    "k8s-consul-mutator.io/last-updated".to_string(),
+                                    now.to_rfc3339(),
                                 );
                             }
-                            transformed_annotations.insert(
-                                "k8s-consul-mutator.io/last-updated".to_string(),
-                                now.to_rfc3339(),
-                            );
+
+                            if app_state.settings.set_deployment_spec_annotations {
+                                for (k, v) in annotations.iter() {
+                                    deployment_spec_annotations.insert(
+                                        format!("k8s-consul-mutator.io/checksum-{k}"),
+                                        v.clone(),
+                                    );
+                                }
+                            }
+                            if app_state.settings.set_deployment_spec_timestamp {
+                                deployment_spec_annotations.insert(
+                                    "k8s-consul-mutator.io/last-updated".to_string(),
+                                    now.to_rfc3339(),
+                                );
+                            }
 
                             let body = json!({
                                 "apiVersion": "apps/v1",
                                 "kind": "Deployment",
                                 "metadata": {
                                     "name": v.deployment.clone(),
-                                    "annotations": transformed_annotations,
+                                    "annotations": deployment_annotations,
                                 },
                                 "spec": {
                                     "template": {
                                         "metadata": {
-                                            "annotations": transformed_annotations,
+                                            "annotations": deployment_spec_annotations,
                                         }
                                     }
                                 }

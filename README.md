@@ -21,6 +21,10 @@ This application uses the following environment variables:
 * `CHECK_KEY_TIMEOUT` - The amount of time to poll consul for key updates.
 * `CHECK_KEY_IDLE` - The amount of time to allow the consul key watcher to idle before shutting down.
 * `CHECK_KEY_ERROR_WAIT` - The amount of time to skip in between cycles when an error is encountered polling consul keys.
+* `SET_DEPLOYMENT_ANNOTATIONS` - Adds the checksum annotations to deployments if set to true. Default true.
+* `SET_DEPLOYMENT_SPEC_ANNOTATIONS` - Adds the checksum annotations to deployment specs if set to true. Default true.
+* `SET_DEPLOYMENT_TIMESTAMP` - Adds the `last-updated` annotation to deployments if set to true. Default true.
+* `SET_DEPLOYMENT_SPEC_TIMESTAMP` - Adds the `last-updated` annotation to deployment specs if set to true. Default false.
 
 The default values are ideal for a verbose and insecure production environment. For production use, start with the following and tune them accordingly:
 
@@ -95,11 +99,10 @@ Commits that were influenced by GitHub Copilot will have the `[copilot]` tag app
 - [X] Update kubernetes resources on consul kv change
 - [X] Stop consul watchers for keys that are no longer used
 - [X] Start consul watchers for existing deployments
-- [ ] Support sha checksums
+- [X] Support sha checksums
 - [ ] Support fnv checksums
-- [ ] Support consul key index values as checksums
 - [ ] Populate background workers at startup
 - [X] Configuration for consul tokens
-- [ ] Configuration for default checksum type
-- [ ] Configuration validation on start
+- [X] Configuration for default checksum type
+- [X] Configuration validation on start
 - [ ] Helm chart

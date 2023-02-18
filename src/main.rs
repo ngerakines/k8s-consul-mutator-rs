@@ -51,6 +51,14 @@ async fn main() -> Result<()> {
         panic!("one or both of PORT and SECURE_PORT must be set to a non-zero value");
     }
 
+    if !settings.set_deployment_annotations
+        && !settings.set_deployment_spec_annotations
+        && !settings.set_deployment_timestamp
+        && !settings.set_deployment_spec_timestamp
+    {
+        warn!("None of set_deployment_annotations, set_deployment_spec_annotations, set_deployment_timestamp, and set_deployment_spec_timestamp are set to true. This means that the deployment will not be updated in any way. This is probably not what you want.");
+    }
+
     let key_manager = get_key_manager(&settings.key_manager_type);
 
     let checksummer = get_checksummer(&settings.checksum_type);

@@ -49,6 +49,27 @@ pub struct Settings {
 
     #[builder(setter(into), default = "self.default_key_manager_type()")]
     pub key_manager_type: String,
+
+    /*
+     * `SET_DEPLOYMENT_ANNOTATIONS` - Adds the checksum annotations to deployments if set to true. Default true.
+     * `SET_DEPLOYMENT_SPEC_ANNOTATIONS` - Adds the checksum annotations to deployment specs if set to true. Default true.
+     * `SET_DEPLOYMENT_TIMESTAMP` - Adds the `last-updated` annotation to deployments if set to true. Default true.
+     * `SET_DEPLOYMENT_SPEC_TIMESTAMP` - Adds the `last-updated` annotation to deployment specs if set to true. Default false.
+     */
+    #[builder(setter(into), default = "self.default_set_deployment_annotations()")]
+    pub set_deployment_annotations: bool,
+
+    #[builder(
+        setter(into),
+        default = "self.default_set_deployment_spec_annotations()"
+    )]
+    pub set_deployment_spec_annotations: bool,
+
+    #[builder(setter(into), default = "self.default_set_deployment_timestamp()")]
+    pub set_deployment_timestamp: bool,
+
+    #[builder(setter(into), default = "self.default_set_deployment_spec_timestamp()")]
+    pub set_deployment_spec_timestamp: bool,
 }
 
 impl SettingsBuilder {
@@ -136,6 +157,50 @@ impl SettingsBuilder {
         env::var("KEY_MANAGER_TYPE")
             .unwrap_or("memory".to_string())
             .to_lowercase()
+    }
+
+    fn default_set_deployment_annotations(&self) -> bool {
+        let value = env::var("SET_DEPLOYMENT_ANNOTATIONS")
+            .unwrap_or("true".into())
+            .to_lowercase();
+        match value.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => true,
+        }
+    }
+
+    fn default_set_deployment_spec_annotations(&self) -> bool {
+        let value = env::var("SET_DEPLOYMENT_SPEC_ANNOTATIONS")
+            .unwrap_or("true".into())
+            .to_lowercase();
+        match value.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => true,
+        }
+    }
+
+    fn default_set_deployment_timestamp(&self) -> bool {
+        let value = env::var("SET_DEPLOYMENT_TIMESTAMP")
+            .unwrap_or("true".into())
+            .to_lowercase();
+        match value.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => true,
+        }
+    }
+
+    fn default_set_deployment_spec_timestamp(&self) -> bool {
+        let value = env::var("SET_DEPLOYMENT_SPEC_TIMESTAMP")
+            .unwrap_or("false".into())
+            .to_lowercase();
+        match value.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => false,
+        }
     }
 }
 
