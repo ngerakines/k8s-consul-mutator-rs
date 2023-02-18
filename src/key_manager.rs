@@ -303,6 +303,18 @@ impl KeyManager for MemoryKeyManager {
     }
 }
 
+pub fn get_key_manager(key_manager_type: &str) -> Box<dyn KeyManager> {
+    match key_manager_type {
+        #[cfg(debug_assertions)]
+        "null" => Box::<NullKeyManager>::default() as Box<dyn KeyManager>,
+
+        #[cfg(feature = "md5")]
+        "memory" => Box::<MemoryKeyManager>::default() as Box<dyn KeyManager>,
+
+        _ => panic!("Unknown key manager type: {key_manager_type}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

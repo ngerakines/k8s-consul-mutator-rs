@@ -129,14 +129,10 @@ pub async fn check_key(
         }
 
         let key_content: Vec<u8> = kv.value.unwrap().try_into().unwrap_or_else(|_| Vec::new());
-        let digest = md5::compute(key_content);
+        let digest = app_state.checksummer.checksum(key_content);
 
-        debug!("consul key watcher checksum: {consul_key} {:x}", digest);
-        if let Err(err) = app_state
-            .key_manager
-            .set(consul_key.clone(), format!("md5-{:x}", digest))
-            .await
-        {
+        debug!("consul key watcher checksum: {consul_key} {digest}");
+        if let Err(err) = app_state.key_manager.set(consul_key.clone(), digest).await {
             warn!("consul key watcher error: {consul_key}: {err}");
             continue;
         }

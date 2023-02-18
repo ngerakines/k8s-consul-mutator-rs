@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::{config::Settings, key_manager::KeyManager};
+use crate::{checksum::Checksummer, config::Settings, key_manager::KeyManager};
 use chrono::{DateTime, Utc};
 use consulrs::client::ConsulClientSettings;
 use tokio::sync::mpsc::Sender;
@@ -26,32 +26,32 @@ pub struct AppState(pub Arc<InnerState>);
 
 pub struct InnerState {
     pub settings: Settings,
-    pub version: String,
     pub key_manager: Box<dyn KeyManager>,
     pub consul_settings: ConsulClientSettings,
     pub tasker: Tasker,
     pub tx: Sender<Work>,
     pub consul_manager_tx: Sender<ConsulWatch>,
+    pub checksummer: Box<dyn Checksummer>,
 }
 
 impl InnerState {
     pub fn new(
         settings: Settings,
-        version: String,
         key_manager: Box<dyn KeyManager>,
         consul_settings: ConsulClientSettings,
         tasker: Tasker,
         tx: Sender<Work>,
         consul_manager_tx: Sender<ConsulWatch>,
+        checksummer: Box<dyn Checksummer>,
     ) -> Self {
         Self {
             settings,
-            version,
             key_manager,
             consul_settings,
             tasker,
             tx,
             consul_manager_tx,
+            checksummer,
         }
     }
 }

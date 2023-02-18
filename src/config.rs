@@ -5,6 +5,21 @@ use derive_builder::Builder;
 #[derive(Builder, Clone, Debug)]
 #[builder(setter(into, strip_option))]
 pub struct Settings {
+    #[builder(setter(into), default = "self.default_version()")]
+    pub version: String,
+
+    #[builder(setter(into), default = "self.default_port()")]
+    pub port: u16,
+
+    #[builder(setter(into), default = "self.default_secure_port()")]
+    pub secure_port: u16,
+
+    #[builder(setter(into), default = "self.default_certificate()")]
+    pub certificate: String,
+
+    #[builder(setter(into), default = "self.default_certificate_key()")]
+    pub certificate_key: String,
+
     #[builder(setter(into), default = "self.default_update_debounce()")]
     pub update_debounce: u16,
 
@@ -28,14 +43,48 @@ pub struct Settings {
 
     #[builder(setter(into), default = "self.default_check_key_error_wait()")]
     pub check_key_error_wait: u16,
+
+    #[builder(setter(into), default = "self.default_checksum_type()")]
+    pub checksum_type: String,
+
+    #[builder(setter(into), default = "self.default_key_manager_type()")]
+    pub key_manager_type: String,
 }
 
 impl SettingsBuilder {
+    fn default_version(&self) -> String {
+        option_env!("GIT_HASH")
+            .unwrap_or(env!("CARGO_PKG_VERSION", "develop"))
+            .to_string()
+    }
+
+    fn default_port(&self) -> u16 {
+        env::var("PORT")
+            .unwrap_or("8080".to_string())
+            .parse::<u16>()
+            .unwrap_or(8080)
+    }
+
+    fn default_secure_port(&self) -> u16 {
+        env::var("SECURE_PORT")
+            .unwrap_or("8443".to_string())
+            .parse::<u16>()
+            .unwrap_or(8443)
+    }
+
     fn default_update_debounce(&self) -> u16 {
         env::var("UPDATE_DEBOUNCE")
             .unwrap_or("60".to_string())
             .parse::<u16>()
             .unwrap_or(60)
+    }
+
+    fn default_certificate(&self) -> String {
+        env::var("CERTIFICATE").unwrap_or("".to_string())
+    }
+
+    fn default_certificate_key(&self) -> String {
+        env::var("CERTIFICATE_KEY").unwrap_or("".to_string())
     }
 
     fn default_watch_dispatcher_first_reconcile(&self) -> u16 {
@@ -75,5 +124,27 @@ impl SettingsBuilder {
             .unwrap_or("60".to_string())
             .parse::<u16>()
             .unwrap_or(60)
+    }
+
+    fn default_checksum_type(&self) -> String {
+        env::var("CHECKSUM_TYPE")
+            .unwrap_or("md5".to_string())
+            .to_lowercase()
+    }
+
+    fn default_key_manager_type(&self) -> String {
+        env::var("KEY_MANAGER_TYPE")
+            .unwrap_or("memory".to_string())
+            .to_lowercase()
+    }
+}
+
+impl Settings {
+    pub fn is_insecure_enabled(&self) -> bool {
+        self.port != 0
+    }
+
+    pub fn is_secure_enabled(&self) -> bool {
+        self.secure_port != 0 && !self.certificate.is_empty() && !self.certificate_key.is_empty()
     }
 }

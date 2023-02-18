@@ -1,15 +1,15 @@
-use std::{borrow::BorrowMut, env, sync::Arc};
-
 use axum_server::{tls_rustls::RustlsConfig, Handle};
 use consulrs::client::ConsulClientSettingsBuilder;
 use std::net::SocketAddr;
+use std::{borrow::BorrowMut, sync::Arc};
+use tokio::signal;
 use tokio::sync::{broadcast, mpsc};
+use tokio_tasker::Tasker;
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use tokio::signal;
-use tracing::{error, info};
-
 mod api;
+mod checksum;
 mod config;
 mod consul;
 mod error;
@@ -20,35 +20,19 @@ mod updater;
 
 use api::build_router;
 use error::Result;
-use key_manager::{KeyManager, MemoryKeyManager, NullKeyManager};
-
-use tokio_tasker::Tasker;
 
 use crate::{
+    checksum::get_checksummer,
     config::SettingsBuilder,
     consul::watch_dispatcher,
     k8s::deployment_watch,
+    key_manager::get_key_manager,
     state::{ConsulWatch, Work},
     updater::update_loop,
 };
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let version = option_env!("GIT_HASH").unwrap_or(env!("CARGO_PKG_VERSION", "develop"));
-
-    let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-    let secure_port = env::var("SECURE_PORT").unwrap_or_else(|_| "8443".to_string());
-
-    let cerificate = env::var("CERTIFICATE").ok();
-    let cerificate_key = env::var("CERTIFICATE_KEY").ok();
-    let start_secure_server =
-        secure_port != "0" && cerificate.is_some() && cerificate_key.is_some();
-    let start_insecure_server = port != "0";
-
-    if !start_secure_server && !start_insecure_server {
-        panic!("one or both of PORT and SECURE_PORT must be set to a non-zero value");
-    }
-
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG")
@@ -57,22 +41,23 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let tasker = Tasker::new();
-
-    let key_manager_type = env::var("KEY_MANAGER_TYPE").unwrap_or_else(|_| "MEMORY".to_owned());
-    let key_manager = match key_manager_type.as_str() {
-        "MEMORY" => Box::<MemoryKeyManager>::default() as Box<dyn KeyManager>,
-        _ => Box::<NullKeyManager>::default() as Box<dyn KeyManager>,
-    };
+    #[cfg(debug_assertions)]
+    warn!("Debug assertions enabled");
 
     let settings_builder = SettingsBuilder::default();
+    let settings = settings_builder.build().unwrap();
+
+    if !settings.is_secure_enabled() && !settings.is_secure_enabled() {
+        panic!("one or both of PORT and SECURE_PORT must be set to a non-zero value");
+    }
+
+    let key_manager = get_key_manager(&settings.key_manager_type);
+
+    let checksummer = get_checksummer(&settings.checksum_type);
 
     let consul_config_builder = ConsulClientSettingsBuilder::default();
 
-    info!(
-        "consul config {:#?}",
-        consul_config_builder.build().unwrap()
-    );
+    let tasker = Tasker::new();
 
     let (shutdown_tx, _) = broadcast::channel(1);
 
@@ -100,12 +85,12 @@ async fn main() -> Result<()> {
         let state_tasker = tasker.clone();
         let shared_state = state::AppState(Arc::new(state::InnerState::new(
             settings_builder.build().unwrap(),
-            version.to_string(),
             key_manager,
             consul_config_builder.build().unwrap(),
             state_tasker.clone(),
             updater_tx.clone(),
             watch_dispatcher_tx.clone(),
+            checksummer,
         )));
 
         {
@@ -153,12 +138,12 @@ async fn main() -> Result<()> {
 
         let app = build_router(shared_state.clone());
 
-        if start_insecure_server {
+        if settings.is_insecure_enabled() {
             let mut insecure_notify = shutdown_tx.subscribe();
             let insecure_app = app.clone();
             tasker.spawn(async move {
                 info!("insecure server starting");
-                axum::Server::bind(&format!("0.0.0.0:{port}").parse().unwrap())
+                axum::Server::bind(&format!("0.0.0.0:{}", settings.port).parse().unwrap())
                     .serve(insecure_app.into_make_service())
                     .with_graceful_shutdown(async move {
                         info!("insecure server waiting on shutdown");
@@ -170,15 +155,15 @@ async fn main() -> Result<()> {
             });
         }
 
-        if start_secure_server {
+        if settings.is_secure_enabled() {
             info!("secure server starting");
 
             let tls_config =
-                RustlsConfig::from_pem_file(cerificate.unwrap(), cerificate_key.unwrap())
+                RustlsConfig::from_pem_file(settings.certificate, settings.certificate_key)
                     .await
                     .unwrap();
 
-            let addr = SocketAddr::from(([0, 0, 0, 0], secure_port.parse::<u16>().unwrap()));
+            let addr = SocketAddr::from(([0, 0, 0, 0], settings.secure_port));
 
             let handle = Handle::new();
 

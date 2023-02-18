@@ -20,7 +20,7 @@ use crate::error::{ConMutError, Result};
 use crate::state::{AppState, ConsulWatch};
 
 async fn handle_index(State(state): State<AppState>) -> impl IntoResponse {
-    Json(json!({"version": state.version}))
+    Json(json!({"version": state.settings.version}))
 }
 
 async fn handle_mutate(
