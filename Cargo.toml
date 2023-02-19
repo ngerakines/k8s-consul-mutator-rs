@@ -5,10 +5,12 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Nick Gerakines <nick.gerakines@gmail.com>"]
 readme = "README.md"
-repository = "https://github.com/ngerakines/something"
+repository = "https://github.com/ngerakines/k8s-consul-mutator-rs"
+homepage = "https://github.com/ngerakines/k8s-consul-mutator-rs"
 license = "MIT"
 publish = false
 build = "build.rs"
+keywords = ["kubernetes", "consul"]
 
 [features]
 default = ["sha256", "md5"]
