@@ -11,14 +11,9 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           components: rustfmt, clippy
       - name: Set up cargo cache
         uses: actions/cache@v3
@@ -59,17 +54,11 @@ jobs:
       matrix:
         k8s: ["v1_20", "v1_21", "v1_22", "v1_23", "v1_24", "v1_25", "v1_26"]
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           components: rustfmt, clippy
-      - name: Set up cargo cache
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         continue-on-error: false
         with:
           path: |
@@ -80,5 +69,4 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
-      - name: Test
-        run: cargo test --no-default-features --features checksums,${{ matrix.k8s }}
+      - run: cargo test --no-default-features --features checksums,${{ matrix.k8s }}
