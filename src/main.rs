@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     let settings_builder = SettingsBuilder::default();
     let settings = settings_builder.build().unwrap();
 
-    if !settings.is_secure_enabled() && !settings.is_secure_enabled() {
+    if !settings.is_secure_enabled() && !settings.is_insecure_enabled() {
         panic!("one or both of PORT and SECURE_PORT must be set to a non-zero value");
     }
 
