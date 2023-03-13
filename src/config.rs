@@ -50,12 +50,6 @@ pub struct Settings {
     #[builder(setter(into), default = "self.default_key_manager_type()")]
     pub key_manager_type: String,
 
-    /*
-     * `SET_DEPLOYMENT_ANNOTATIONS` - Adds the checksum annotations to deployments if set to true. Default true.
-     * `SET_DEPLOYMENT_SPEC_ANNOTATIONS` - Adds the checksum annotations to deployment specs if set to true. Default true.
-     * `SET_DEPLOYMENT_TIMESTAMP` - Adds the `last-updated` annotation to deployments if set to true. Default true.
-     * `SET_DEPLOYMENT_SPEC_TIMESTAMP` - Adds the `last-updated` annotation to deployment specs if set to true. Default false.
-     */
     #[builder(setter(into), default = "self.default_set_deployment_annotations()")]
     pub set_deployment_annotations: bool,
 

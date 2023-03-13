@@ -8,7 +8,6 @@ use md5::compute;
 
 #[async_trait]
 pub trait Checksummer: Sync + Send {
-    /// Returns a checksum for the given data.
     fn checksum(&self, data: Vec<u8>) -> String;
 }
 
