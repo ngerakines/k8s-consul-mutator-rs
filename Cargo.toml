@@ -31,7 +31,7 @@ async-trait = {version = "0.1"}
 axum = "0.6.7"
 axum-server = {version = "0.4.7", features = ["tls-rustls"]}
 backoff = "0.4.0"
-chrono = {version = "0.4.23",  default-features = false, features = ["clock"]}
+chrono = {version = "0.4.24",  default-features = false, features = ["clock"]}
 consulrs = { git = "https://github.com/ngerakines/consulrs.git", rev = "b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b" }
 derive_builder = "0.12.0"
 futures-util = "0.3.27"
