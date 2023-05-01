@@ -1,9 +1,8 @@
 use futures::prelude::*;
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
-    runtime::watcher,
-    Client,
+    api::{Api, ResourceExt},
+    runtime, Client,
 };
 use tokio_tasker::Stopper;
 use tracing::{error, info};
@@ -31,50 +30,51 @@ pub async fn deployment_watch(app_state: AppState, stopper: Stopper) -> Result<(
 
     info!("kubernetes deployment watcher started");
 
-    let deployment_watcher = watcher(api, ListParams::default()).try_for_each(|event| async {
-        match event {
-            kube::runtime::watcher::Event::Deleted(d) => {
-                // TODO: Don't unwatch deployments that aren't annotated.
-                let namespace = d.namespace();
-                let name = d.name_any();
-                if namespace.is_some() && !name.is_empty() {
-                    if let Err(err) = app_state
-                        .key_manager
-                        .unwatch_deployment(namespace.clone().unwrap(), name)
-                        .await
-                    {
-                        error!(
+    let deployment_watcher = runtime::watcher::watcher(api, runtime::watcher::Config::default())
+        .try_for_each(|event| async {
+            match event {
+                kube::runtime::watcher::Event::Deleted(d) => {
+                    // TODO: Don't unwatch deployments that aren't annotated.
+                    let namespace = d.namespace();
+                    let name = d.name_any();
+                    if namespace.is_some() && !name.is_empty() {
+                        if let Err(err) = app_state
+                            .key_manager
+                            .unwatch_deployment(namespace.clone().unwrap(), name)
+                            .await
+                        {
+                            error!(
                             "kubernetes deployment watcher error: failed to unwatch deployment: {}",
                             err
                         );
+                        }
                     }
                 }
-            }
-            kube::runtime::watcher::Event::Applied(d) => {
-                // TODO: Look for annotation removal and unwatch accordingly.
-                let subscriptions = subscriptions_from_deployment(&d).await;
-                for sub in subscriptions {
-                    if let Err(err) = app_state
-                        .key_manager
-                        .watch(
-                            sub.namespace,
-                            sub.deployment,
-                            sub.config_key,
-                            sub.consul_key.clone(),
-                        )
-                        .await
-                    {
-                        error!(
+                kube::runtime::watcher::Event::Applied(d) => {
+                    // TODO: Look for annotation removal and unwatch accordingly.
+                    let subscriptions = subscriptions_from_deployment(&d).await;
+                    for sub in subscriptions {
+                        if let Err(err) = app_state
+                            .key_manager
+                            .watch(
+                                sub.namespace,
+                                sub.deployment,
+                                sub.config_key,
+                                sub.consul_key.clone(),
+                            )
+                            .await
+                        {
+                            error!(
                             "kubernetes deployment watcher error: failed to watch deployment: {}",
                             err
                         );
+                        }
                     }
                 }
+                _ => {}
             }
-            _ => {}
-        }
-        Ok(())
-    });
+            Ok(())
+        });
 
     tokio::select! {
         res = deployment_watcher => {
