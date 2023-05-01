@@ -26,7 +26,7 @@ v1_21 = ["k8s-openapi/v1_21"]
 v1_20 = ["k8s-openapi/v1_20"]
 
 [dependencies]
-anyhow = { version = "1.0.70", features = ["backtrace"] }
+anyhow = { version = "1.0.71", features = ["backtrace"] }
 async-trait = {version = "0.1"}
 axum = "0.6.7"
 axum-server = {version = "0.4.7", features = ["tls-rustls"]}
