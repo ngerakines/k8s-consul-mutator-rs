@@ -29,7 +29,7 @@ v1_20 = ["k8s-openapi/v1_20"]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 async-trait = {version = "0.1"}
 axum = "0.6.7"
-axum-server = {version = "0.4.7", features = ["tls-rustls"]}
+axum-server = {version = "0.5.0", features = ["tls-rustls"]}
 backoff = "0.4.0"
 chrono = {version = "0.4.24",  default-features = false, features = ["clock"]}
 consulrs = { git = "https://github.com/ngerakines/consulrs.git", rev = "b7c5d6dc9e8edb893fe59a2d54ac328d141d3f0b" }
