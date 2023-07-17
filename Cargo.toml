@@ -38,7 +38,7 @@ futures-util = "0.3.28"
 futures = "0.3.28"
 json-patch = "1.0.0"
 k8s-openapi = { version = "0.18.0", default-features = false, features = ["api"] }
-kube = { version = "0.82.2", default-features = false, features = ["admission", "rustls-tls", "client", "runtime"] }
+kube = { version = "0.84.0", default-features = false, features = ["admission", "rustls-tls", "client", "runtime"] }
 md5 = {version = "0.7.0", optional = true}
 parking_lot = "0.12"
 rand = "0.8"
